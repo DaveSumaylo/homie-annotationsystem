@@ -67,12 +67,15 @@
   .section-head .hint{font-size:12.5px;color:var(--ink-soft)}
 
   /* ---------- Bot grid ---------- */
-  .bot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
-  .bot-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:.15s;position:relative}
+  .bot-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  @media(max-width:1200px){.bot-grid{grid-template-columns:repeat(4,1fr)}}
+  @media(max-width:980px){.bot-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:680px){.bot-grid{grid-template-columns:repeat(2,1fr)}}
+  .bot-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px;cursor:pointer;transition:.15s;position:relative}
   .bot-card:hover{border-color:var(--acc-line);transform:translateY(-1px);box-shadow:var(--shadow)}
   .bot-card .row1{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-  .bot-emoji{font-size:20px;line-height:1;flex:none}
-  .bot-card h3{margin:0;font-size:15.5px;font-weight:800;letter-spacing:-.2px}
+  .bot-emoji{font-size:17px;line-height:1;flex:none}
+  .bot-card h3{margin:0;font-size:14px;font-weight:800;letter-spacing:-.2px}
   .bot-card .count-pill{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--ink-soft);background:var(--surface-3);border:1px solid var(--border);border-radius:20px;padding:3px 9px}
   .assignee-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;min-height:24px}
   .assignee-line .lbl{font-size:11px;color:var(--ink-faint);font-weight:600;margin-right:2px}
@@ -226,16 +229,23 @@
   @media (max-width:820px){.tree-layout{grid-template-columns:1fr}.tree-panel{position:static;max-height:340px}}
   @media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.brand-txt span{display:none}.wrap{padding:20px 14px 70px}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-  .bot-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 12px}
-  .bot-stats .bs{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:8px 6px;text-align:center}
-  .bs-label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:var(--ink-faint)}
-  .bs-num{display:block;font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:2px;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .bot-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:4px 0 9px}
+  .bot-stats .bs{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:5px 3px;text-align:center}
+  .bs-label{display:block;font-size:8.5px;font-weight:700;letter-spacing:.4px;color:var(--ink-faint)}
+  .bs-num{display:block;font-size:15px;font-weight:800;letter-spacing:-.4px;margin-top:1px;font-variant-numeric:tabular-nums;color:var(--ink)}
   .bs-num.done{color:var(--acc)} .bs-num.pend{color:var(--amber)}
   .cprog{position:relative;height:20px;background:var(--surface-3);border:1px solid var(--border);border-radius:7px;overflow:hidden}
   .cprog>i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--acc-dark),#12a874);transition:width .3s}
   .cprog .prog-pct{position:relative;z-index:1;display:block;text-align:center;line-height:20px;font-size:11.5px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55);letter-spacing:.3px}
   body{text-transform:uppercase}
   input,textarea,select,option,.ep-name,.s-name,.g-name,.anno-pill,.asg,.g-asg,.ep-assignee{text-transform:none}
+  .cprog.warn>i{background:linear-gradient(90deg,#b45309,var(--amber))}
+  select.asg,select.g-asg{text-align:center;text-align-last:center}
+  .tclip.warn{color:#f4b45e!important;background:rgba(245,158,11,.18)!important}
+  .month-bar{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:800;color:var(--ink);background:var(--surface-3);border:1px solid var(--border-strong);border-radius:9px;padding:8px 11px;margin:10px 0 6px;cursor:pointer;user-select:none}
+  .month-bar .mcount{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-faint)}
+  .month-bar .mcount.warn{color:var(--amber)}
+  .month-group .date-group{margin-left:10px}
   :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 </style>
 </head>
@@ -304,6 +314,7 @@ let state=load();
 let mode='manager';
 let openBot=null;
 const drawerOpen=new Set();       // manager drawer date groups that are EXPANDED (default collapsed)
+const drawerMonthOpen=new Set();  // manager drawer month groups EXPANDED (default collapsed)
 const collapsedBots=new Set();    // tree: bots open unless listed
 const openMonths=new Set();       // tree: months closed unless listed ('Bot|YYYY-MM')
 let sel={bot:null,day:null};      // selected day in tree
@@ -590,7 +601,7 @@ function renderManager(){
       <div class="stat s-pend"><div class="k">Pending</div><div class="v" style="color:var(--amber)">${o.pending}</div><div class="sub">awaiting annotation</div></div>
       <div class="stat s-bots"><div class="k">Active bots</div><div class="v" style="color:var(--blue)">${o.activeBots}</div><div class="sub">have episodes loaded</div></div>
     </div>
-    <div class="section-head"><h2>Bots</h2><span class="hint">Click a bot to paste episodes and assign annotators per date or per episode</span></div>
+    <div class="section-head"><h2>Bots</h2></div>
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
   app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>openDrawer(c.dataset.bot)));
 }
@@ -603,7 +614,7 @@ function botCard(bot){
       <div class="bs"><span class="bs-label">Done</span><span class="bs-num done">${s.done}</span></div>
       <div class="bs"><span class="bs-label">Pending</span><span class="bs-num pend">${pending}</span></div>
     </div>
-    <div class="cprog"><i style="width:${s.pct}%"></i><span class="prog-pct">${s.pct}%</span></div>
+    <div class="cprog ${s.pct<100?'warn':''}"><i style="width:${s.pct}%"></i><span class="prog-pct">${s.pct}%</span></div>
   </div>`;
 }
 
@@ -621,11 +632,6 @@ function renderDrawer(){
     <div class="drawer-head"><h2><span class="bot-emoji">${botIcon(bot)}</span>${esc(bot)}</h2>
       <button class="icon-btn" id="dClose" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
     <div class="drawer-body">
-      <div class="assign-box">
-        <div class="ab-top"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><b>Assign whole bot</b></div>
-        <select id="assignSel"><option value="">— Unassigned —</option>${state.annotators.map(a=>`<option value="${esc(a)}" ${a===def?'selected':''}>${esc(a)}</option>`).join('')}</select>
-        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:8px">Sets everyone in ${esc(bot)} at once, and the default for new pastes. Override any date or episode below.</div>
-      </div>
       <label class="fld"><span class="fl">Paste episode names (one per line)</span>
         <textarea id="pasteBox" placeholder="episode_2026-07-10_10-41-20&#10;episode_2026-07-10_10-51-20"></textarea></label>
       <div style="display:flex;gap:10px;margin-bottom:6px">
@@ -636,18 +642,23 @@ function renderDrawer(){
       </div>
       <div class="section-head" style="margin-top:24px;margin-bottom:10px"><h2 style="font-size:14px">Episodes</h2><span class="hint"><span style="color:var(--acc);font-weight:700">${s.done}</span> / ${s.total} done</span></div>
       ${eps.length===0?emptyBlock('No episodes yet','Paste the names you copied from the site above, then Add episodes.')
-        :dates.map(d=>{const key=dateKey(bot,d);const col=!drawerOpen.has(key);const rows=groups[d];const uniq=[...new Set(rows.map(e=>e.assignee).filter(Boolean))];const common=uniq.length===1?uniq[0]:'';
-          return `<div class="date-group"><div class="date-bar" data-toggle="${key}">
-              <button class="chev ${col?'':'open'}" tabindex="-1">${CHEVSVG}</button>${CALSVG}${prettyDate(d)}<span class="dcount">(${rows.length})</span>
-              <div class="date-assign"><span class="mini-lbl">Assign all</span>${assigneeSelectDate(bot,d,common)}</div></div>
-            ${col?'':rows.map(mgrEpRow).join('')}</div>`;}).join('')}
+        :monthsOf(bot).map(m=>{
+            const mkey='dm:'+bot+'|'+m;const mcol=!drawerMonthOpen.has(mkey);const mdays=daysInMonth(bot,m);
+            let mdone=0,mtot=0;mdays.forEach(d=>{const st=statsOf(groups[d]||[]);mdone+=st.done;mtot+=st.total;});const minc=mdone<mtot;
+            return `<div class="month-group"><div class="month-bar" data-mtoggle="${esc(mkey)}"><button class="chev ${mcol?'':'open'}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span>${m==='Undated'?'Undated':esc(m)}</span><span class="mcount ${minc?'warn':''}">${minc?'⚠️ ':''}${mdone}/${mtot}</span></div>
+              ${mcol?'':mdays.map(d=>{const key=dateKey(bot,d);const col=!drawerOpen.has(key);const rows=groups[d]||[];const uniq=[...new Set(rows.map(e=>e.assignee).filter(Boolean))];const common=uniq.length===1?uniq[0]:'';
+                return `<div class="date-group"><div class="date-bar" data-toggle="${key}">
+                    <button class="chev ${col?'':'open'}" tabindex="-1">${CHEVSVG}</button>${CALSVG}${prettyDate(d)}<span class="dcount">(${rows.length})</span>
+                    <div class="date-assign"><span class="mini-lbl">Assign all</span>${assigneeSelectDate(bot,d,common)}</div></div>
+                  ${col?'':rows.map(mgrEpRow).join('')}</div>`;}).join('')}
+            </div>`;}).join('')}
     </div>`;
   drawer.querySelector('#dClose').addEventListener('click',closeDrawer);
-  drawer.querySelector('#assignSel').addEventListener('change',e=>{assignWholeBot(bot,e.target.value);renderDrawer();render();toast(e.target.value?`${bot} → ${e.target.value}`:`${bot} unassigned`);});
   drawer.querySelector('#addEps').addEventListener('click',()=>{const box=drawer.querySelector('#pasteBox');if(!box.value.trim()){toast('Paste some episode names first');return;}const r=addEpisodes(bot,box.value);box.value='';renderDrawer();render();toast(`Added ${r.added} episode${r.added===1?'':'s'}${r.skipped?` · ${r.skipped} duplicate skipped`:''}`);});
   const clr=drawer.querySelector('#clearEps');if(clr)clr.addEventListener('click',()=>{if(confirm(`Remove all episodes from ${bot}?`)){clearBotEpisodes(bot);renderDrawer();render();toast(`Cleared ${bot}`);}});
   drawer.querySelector('#importCsv').addEventListener('click',()=>drawer.querySelector('#csvFile').click());
   drawer.querySelector('#csvFile').addEventListener('change',ev=>{const f=ev.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const recs=parseEpisodeCSV(rd.result);if(!recs.length){toast('No episode_ rows found in that CSV');return;}const r=upsertEpisodes(bot,recs);renderDrawer();render();toast(`Imported ${r.added} new · updated ${r.updated} in ${bot}`);};rd.readAsText(f);ev.target.value='';});
+  drawer.querySelectorAll('[data-mtoggle]').forEach(bar=>bar.addEventListener('click',()=>{const k=bar.dataset.mtoggle;drawerMonthOpen.has(k)?drawerMonthOpen.delete(k):drawerMonthOpen.add(k);renderDrawer();}));
   drawer.querySelectorAll('[data-toggle]').forEach(bar=>bar.addEventListener('click',e=>{if(e.target.closest('.date-assign'))return;const k=bar.dataset.toggle;drawerOpen.has(k)?drawerOpen.delete(k):drawerOpen.add(k);renderDrawer();}));
   drawer.querySelectorAll('[data-asgdate]').forEach(sel2=>sel2.addEventListener('change',e=>{const [b,d]=e.target.dataset.asgdate.split('|');assignDate(b,d,e.target.value);renderDrawer();render();toast(e.target.value?`${prettyShort(d)} → ${e.target.value}`:'Date unassigned');}));
   drawer.querySelectorAll('[data-asg]').forEach(sel2=>sel2.addEventListener('change',e=>{assignEpisode(e.target.dataset.asg,e.target.value);renderDrawer();render();}));
@@ -689,7 +700,7 @@ function treeBot(bot){
     ${bo?months.map(m=>{const mo=monthOpen(bot,m);const days=daysInMonth(bot,m);
       return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span><span class="tcount">${days.length}d</span></div>
         ${mo?days.map(d=>{const active=sel.bot===bot&&sel.day===d;const st=statsOf(dayEpisodes(bot,d));
-          return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span><span class="tclip">${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
+          return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span><span class="tclip ${st.done<st.total?'warn':''}">${st.done<st.total?'⚠️ ':''}${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
 }
 function detailPane(){
   if(!sel.day||!sel.bot) return `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg><h3>No date selected</h3><p>Pick a bot and date from the tree on the left to open its episodes.</p></div>`;
