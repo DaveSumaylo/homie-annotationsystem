@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   :root{
     --bg:#0a0b0d; --surface:#141518; --surface-2:#1a1c20; --surface-3:#212328;
@@ -56,10 +57,10 @@
 
   /* ---------- Summary strip ---------- */
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
-  .stat{background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--acc);border-radius:12px;padding:15px 17px}
+  .stat{position:relative;overflow:hidden;background:linear-gradient(160deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-top:2px solid var(--sc,var(--acc));border-radius:14px;padding:16px 18px}.stat::after{content:'';position:absolute;top:-34px;right:-34px;width:92px;height:92px;border-radius:50%;background:var(--sc,var(--acc));opacity:.08;filter:blur(4px)}.stat-ic{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:var(--sc);background:color-mix(in srgb,var(--sc) 15%,transparent);border:1px solid color-mix(in srgb,var(--sc) 32%,transparent)}.stat-ic svg{width:17px;height:17px}
   .stat.s-done{border-top-color:var(--green)} .stat.s-pend{border-top-color:var(--amber)} .stat.s-bots{border-top-color:var(--blue)}
   .stat .k{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.6px}
-  .stat .v{font-size:30px;font-weight:800;letter-spacing:-1px;margin-top:4px}
+  .stat .v{font-size:30px;font-weight:800;letter-spacing:-1px;margin-top:4px;color:var(--sc,var(--ink))}
   .stat .sub{font-size:12px;color:var(--ink-soft);margin-top:1px}
 
   .section-head{display:flex;align-items:center;gap:12px;margin:0 0 14px}
@@ -261,8 +262,8 @@
   .dash-top input[type=date]{width:auto;margin-left:auto}
   .dash-periods{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
   @media(max-width:820px){.dash-periods{grid-template-columns:1fr}}
-  .pcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
-  .pcard .ph{font-size:12px;font-weight:800;color:var(--acc);margin-bottom:12px;letter-spacing:.3px}
+  .pcard{background:linear-gradient(160deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-top:2px solid var(--pc,var(--acc));border-radius:12px;padding:16px}
+  .pcard .ph{font-size:12px;font-weight:800;color:var(--pc,var(--acc));margin-bottom:12px;letter-spacing:.3px}
   .pcard .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .pcard .pm .pl{font-size:10px;font-weight:700;color:var(--ink-faint);letter-spacing:.4px}
   .pcard .pm .pv{font-size:22px;font-weight:800;letter-spacing:-.6px;font-variant-numeric:tabular-nums;margin-top:2px}
@@ -270,7 +271,7 @@
   .kpi-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
   .kpi-head h3{margin:0;font-size:14px;font-weight:800}
   .kpi-head .kh{font-size:11px;color:var(--ink-faint);font-weight:700}
-  .kpi-row{display:grid;grid-template-columns:24px 150px 1fr 1fr;gap:16px;align-items:center;padding:10px 8px;border-bottom:1px solid var(--border)}
+  .kpi-row{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start;padding:9px 5px;border-bottom:1px solid var(--border)}
   .kpi-row:last-child{border-bottom:0}
   .kpi-row.done{background:rgba(52,211,153,.07);border-radius:8px}
   .kpi-rank{font-size:12px;font-weight:800;color:var(--ink-faint);text-align:center}
@@ -280,14 +281,56 @@
   .kbar{height:7px;background:var(--surface-3);border-radius:20px;overflow:hidden;border:1px solid var(--border)}
   .kbar>i{display:block;height:100%;border-radius:20px;background:var(--amber);transition:width .3s}
   .kbar>i.full{background:linear-gradient(90deg,var(--acc-dark),var(--acc))}
+  .kpi-rank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--ink-soft);background:var(--surface-3);border:1px solid var(--border)}
+  .kpi-rank.r1{background:linear-gradient(160deg,#fde68a,#f59e0b);color:#3a2600;border-color:#f59e0b}
+  .kpi-rank.r2{background:linear-gradient(160deg,#e5e7eb,#9ca3af);color:#1f2430;border-color:#9ca3af}
+  .kpi-rank.r3{background:linear-gradient(160deg,#fdba74,#c2721f);color:#2a1500;border-color:#c2721f}
+  .kpi-main{min-width:0}
+  .kpi-name{font-weight:700;font-size:13px;margin-bottom:6px}
+  .kpi-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .kmetric{min-width:0}
+  .kmr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+  .kml{font-size:9px;font-weight:800;color:var(--ink-faint);letter-spacing:.3px}
+  .kmv{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums}
+  .kmetric .kbar{height:5px}
+  /* reference-style dashboard */
+  .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+  @media(max-width:1000px){.trio{grid-template-columns:1fr}}
+  .pp{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .pt2{font-size:11px;font-weight:700;color:var(--acc);letter-spacing:.7px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .pth2{font-size:10px;color:var(--acc);font-weight:600}
+  .pg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .ps{background:var(--surface-2);border-radius:8px;padding:14px 16px}
+  .psl{font-size:12px;color:var(--ink-soft);margin-bottom:5px;letter-spacing:.3px}
+  .psv{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+  .dash-left{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1}
+  @media(max-width:900px){.chart-row{grid-template-columns:1fr}.dash-main{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column}
+  .pt{font-size:11px;font-weight:700;color:var(--ink);letter-spacing:.7px;margin-bottom:10px;display:flex;align-items:center;gap:8px;border-left:3px solid var(--acc);padding-left:8px}
+  .pth{font-size:10px;color:var(--ink-faint);font-weight:600;font-style:italic;letter-spacing:.2px}
+  .chbox{position:relative;flex:1;min-height:210px;width:100%}
+  .chbox canvas{position:absolute;inset:0}
+  .kpi-list{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+  .kitem{background:var(--surface-2);border-radius:8px;padding:7px 9px}
+  .krow1{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+  .krank{font-size:9px;font-weight:800;color:var(--ink-faint);width:14px;flex-shrink:0}
+  .kname{font-size:11px;font-weight:700;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kmets{display:flex;gap:8px}
+  .km{flex:1;min-width:0}
+  .kmt{display:flex;justify-content:space-between;font-size:8.5px;color:var(--ink-soft);margin-bottom:2px;font-weight:700}
+  .kbarx{height:4px;background:var(--surface-3);border-radius:3px;overflow:hidden}
+  .kbarx>i{display:block;height:100%;border-radius:3px;transition:width .5s}
+  .chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-faint);font-size:11px;border:1px dashed var(--border-strong);border-radius:8px}
+  .kpi-wrap{background:linear-gradient(160deg,var(--surface),var(--surface-2))}
   .party{margin-left:6px;display:inline-block;animation:party 1s ease-in-out infinite}
   @keyframes party{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-4px) rotate(8deg)}}
   /* dashboard charts + right KPI */
-  .dash-main{display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start}
+  .dash-main{display:grid;grid-template-columns:1fr 320px;gap:12px;align-items:stretch;margin-top:12px}
   @media(max-width:1100px){.dash-main{grid-template-columns:1fr}}
   .dash-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:700px){.dash-charts{grid-template-columns:1fr}}
-  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .chart-card{background:linear-gradient(160deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-radius:12px;padding:14px;transition:.15s}.chart-card:hover{border-color:var(--border-strong)}
   .chart-card .ct{font-size:11.5px;font-weight:800;color:var(--acc)}
   .chart-card .cs{font-size:10.5px;color:var(--ink-faint);margin:2px 0 8px}
   .chart-empty{height:180px;display:grid;place-items:center;color:var(--ink-faint);font-size:12px;text-align:center;padding:16px;border:1px dashed var(--border-strong);border-radius:8px}
@@ -297,12 +340,18 @@
   .tl-clk-sub{font-size:11px;color:var(--ink-faint)}
   .tl-clock select{width:auto;min-width:180px}
   .tl-table{margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-  .tl-cols,.tl-row{display:grid;grid-template-columns:1.2fr 1.2fr 1fr 1fr .6fr}
+  .tl-cols,.tl-row{display:grid;grid-template-columns:1.25fr 1.15fr .95fr .95fr .7fr 42px}
   .tl-cols{background:var(--surface-3);font-size:10px;font-weight:800;letter-spacing:.4px;color:var(--ink-faint);border-bottom:1px solid var(--border)}
   .tl-cols>div{padding:9px 12px;border-right:1px solid var(--border)}
   .tl-row{font-size:12.5px;border-bottom:1px solid #202226}
   .tl-row:hover{background:var(--surface-2)}
-  .tl-row>div{padding:7px 12px;border-right:1px solid #202226;display:flex;align-items:center}
+  .tl-row>div{padding:5px 8px;border-right:1px solid #202226;display:flex;align-items:center}
+  .tl-in{width:100%;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;font-size:12px;color:var(--ink)}
+  .tl-in:hover{border-color:var(--border)}
+  .tl-in:focus{border-color:var(--acc);background:var(--surface-2);outline:none}
+  select.tl-in.tl-person{font-weight:600}
+  input.tl-in.tl-hrs{font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums}
+  .tl-row .trash{width:26px;height:26px}
   .tl-person{font-weight:600}
   .tl-hrs{font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
   :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -370,6 +419,8 @@ const TIMELOG_SEED=[["tl_2026-07-15_Kent_1056","Kent","2026-07-15T10:56","2026-0
 let tlFilter='';
 const FULLTIME=['Alwin','Ata','Axl','Cris','Kent','Mark Aaron','Darius','Sean','Sharbell','Jerome'];
 const DAILY_TARGET=21, WEEKLY_TARGET=126;
+const COLORS=['#4caf50','#42a5f5','#ce93d8','#ffa726','#ef5350','#26c6da','#66bb6a','#ab47bc','#ff7043','#29b6f6','#9ccc65','#ffca28'];
+let _charts=[];
 let dashDate=(new Date()).toISOString().slice(0,10);
 let activeShift=null; try{activeShift=JSON.parse(localStorage.getItem('projectHomie.shift')||'null');}catch(e){}
 let clockTick=null;
@@ -392,7 +443,11 @@ let sel={bot:null,day:null};      // selected day in tree
 let botFilter='';                 // tree bot filter ('' = all)
 
 function load(){try{const raw=localStorage.getItem(KEY);if(!raw)return structuredClone(SEED);return Object.assign(structuredClone(SEED),JSON.parse(raw));}catch(e){return structuredClone(SEED);}}
-function save(){localStorage.setItem(KEY,JSON.stringify(state));scheduleCloudSync();}
+let _saveTimer=null;
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){console.error('persist failed',e);}}
+function save(){scheduleCloudSync();clearTimeout(_saveTimer);_saveTimer=setTimeout(()=>{_saveTimer=null;persistLocal();},450);}
+window.addEventListener('beforeunload',persistLocal);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)persistLocal();});
 function uid(){return 'e'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);}
 
 /* ---------- helpers ---------- */
@@ -706,13 +761,21 @@ function renderTopClock(){
 async function cloudPushEntry(entry){await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:entry.id,person:entry.person,start:entry.start,end:entry.end,minutes:entry.minutes,day:entry.day}])});}
 async function cloudLoadEntries(){const r=await sbFetch('time_entries?select=*&order=start&limit=20000',{headers:sbHeaders()});return await r.json();}
 async function cloudUpsertEntries(entries){for(let i=0;i<entries.length;i+=500){const chunk=entries.slice(i,i+500).map(e=>({id:e.id,person:e.person,start:e.start,end:e.end,minutes:e.minutes,day:e.day}));await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
+let deletedTimeIds=new Set();try{deletedTimeIds=new Set(JSON.parse(localStorage.getItem('projectHomie.tdel')||'[]'));}catch(e){}
+function saveDeleted(){localStorage.setItem('projectHomie.tdel',JSON.stringify([...deletedTimeIds]));}
+function hhmm(iso){return iso&&iso.indexOf('T')>=0?iso.split('T')[1].slice(0,5):'';}
+function minutesBetween(a,b){if(!a||!b||a.indexOf('T')<0||b.indexOf('T')<0)return null;const x=a.split('T')[1].split(':'),y=b.split('T')[1].split(':');let m=(+y[0]*60+ +y[1])-(+x[0]*60+ +x[1]);if(m<0)m+=1440;return m;}
+function pushEntry(t){if(CLOUD)cloudUpsertEntries([t]).catch(e=>console.error(e));}
+function deleteTimeEntry(id){deletedTimeIds.add(id);saveDeleted();state.timeEntries=state.timeEntries.filter(x=>x.id!==id);save();if(CLOUD)sbFetch('time_entries?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})}).catch(e=>console.error(e));}
+function addTimeEntry(){const day=(dashDate||todayISO());const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:(state.annotators[0]||''),start:day+'T09:00',end:day+'T17:00',minutes:480,day};state.timeEntries.push(e);save();pushEntry(e);renderTimeLog();}
+// Self-healing: every load, re-add any embedded records missing locally (unless user deleted them)
 function seedTimeLogOnce(){
-  if(localStorage.getItem('projectHomie.import_timelog'))return;
   const have=new Set(state.timeEntries.map(t=>t.id));
-  const add=TIMELOG_SEED.filter(a=>!have.has(a[0])).map(a=>({id:a[0],person:a[1],start:a[2],end:a[3],minutes:a[4],day:a[5]}));
+  const add=TIMELOG_SEED.filter(a=>!have.has(a[0])&&!deletedTimeIds.has(a[0])).map(a=>({id:a[0],person:a[1],start:a[2],end:a[3],minutes:a[4],day:a[5]}));
   if(add.length){state.timeEntries.push(...add);save();if(CLOUD)cloudUpsertEntries(add).catch(e=>console.error(e));}
+  const first=!localStorage.getItem('projectHomie.import_timelog');
   localStorage.setItem('projectHomie.import_timelog','1');
-  if(add.length)setTimeout(()=>toast('Loaded '+add.length+' time-log records'),1500);
+  if(add.length&&first)setTimeout(()=>toast('Loaded '+add.length+' time-log records'),1500);
 }
 
 /* ---------- Dashboard ---------- */
@@ -726,75 +789,133 @@ function hoursOn(pred){let m=0;state.timeEntries.forEach(t=>{if(FULLTIME.include
 function eph(eps,hrs){return hrs>0&&eps>0?Math.round(eps/hrs*100)/100:0;}
 function personDaily(p,day){return state.episodes.filter(e=>e.done&&e.dateLabeled===day&&e.assignee===p).length;}
 function personWeekly(p,day){return state.episodes.filter(e=>e.done&&e.dateLabeled&&inWeek(e.dateLabeled,day)&&e.assignee===p).length;}
-function pcard(title,eps,hrs,ephv){return `<div class="pcard"><div class="ph">${title}</div><div class="pgrid">
+function pcard(title,eps,hrs,ephv,accent){return `<div class="pcard" style="--pc:${accent||'var(--acc)'}"><div class="ph">${title}</div><div class="pgrid">
   <div class="pm"><div class="pl">Episodes</div><div class="pv">${eps.toLocaleString()}</div></div>
   <div class="pm"><div class="pl">Hours</div><div class="pv">${fmtHrs(hrs)}</div></div>
-  <div class="pm"><div class="pl">EPH</div><div class="pv" style="color:var(--acc)">${ephv}</div></div></div></div>`;}
+  <div class="pm"><div class="pl">EPH</div><div class="pv" style="color:var(--pc)">${ephv}</div></div></div></div>`;}
+function weeksBetween(a,b){const out=[];let d=new Date(a+'T00:00:00');const stop=new Date(b+'T00:00:00');while(d<=stop){out.push(d.toISOString().slice(0,10));d=new Date(d);d.setDate(d.getDate()+7);}return out;}
+function dashSeries(day){
+  const wk={};const mo={};
+  state.episodes.forEach(e=>{if(e.done&&e.dateLabeled){const mon=isoWeekRange(e.dateLabeled)[0];wk[mon]=(wk[mon]||0)+1;const m=e.dateLabeled.slice(0,7);mo[m]=(mo[m]||0)+1;}});
+  const wkKeys=Object.keys(wk).sort();const curW=isoWeekRange(day)[0];
+  const weeks=wkKeys.length?weeksBetween(wkKeys[0],curW):[];
+  const W={labels:weeks.map(w=>'Wk'+isoWeekNum(w)),data:weeks.map(w=>wk[w]||0),colors:weeks.map(w=>w===curW?'rgba(76,175,80,.9)':'rgba(66,165,245,.7)')};
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const moKeys=Object.keys(mo).sort();
+  const M={labels:moKeys.map(k=>MN[+k.slice(5,7)-1]),data:moKeys.map(k=>mo[k]),colors:moKeys.map((k,i)=>COLORS[i%COLORS.length]),keys:moKeys};
+  return {W,M};
+}
+function destroyCharts(){_charts.forEach(c=>{try{c.destroy();}catch(e){}});_charts=[];}
+function chartOpts(yfmt){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#888',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:Object.assign({color:'#888',font:{size:10}},yfmt||{}),beginAtZero:true}}};}
 function renderDashboard(){
   const o=overall();const day=dashDate;
   const totalHours=hoursOn(()=>true);
   const dEps=epDoneOn(day).length,dHrs=hoursOn(d=>d===day),dEph=eph(dEps,dHrs);
   const wEps=epDoneWeek(day).length,wHrs=hoursOn(d=>inWeek(d,day)),wEph=eph(wEps,wHrs);
   const mEps=epDoneMonth(day).length,mHrs=hoursOn(d=>inMonth(d,day)),mEph=eph(mEps,mHrs);
-  const kpi=FULLTIME.map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d);
+  const kpi=FULLTIME.map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d).slice(0,10);
+  const S=dashSeries(day);
+  const wr=isoWeekRange(day);
+  const wkAvgArr=S.W.data.slice(0,-1).filter(v=>v>0);const wkAvg=wkAvgArr.length?Math.round(wkAvgArr.reduce((s,v)=>s+v,0)/wkAvgArr.length):0;
+  const moFull=S.M.data.slice(0,-1).filter(v=>v>0);const moAvg=moFull.length?Math.round(moFull.reduce((s,v)=>s+v,0)/moFull.length):0;
+  const n=S.M.data.length;const trend=n>=2?(S.M.data[n-1]<S.M.data[n-2]?'↓ Declining':'↑ Improving'):'';
+  const ps=(l,v)=>`<div class="ps"><div class="psl">${l}</div><div class="psv">${v}</div></div>`;
   app.innerHTML=`
    <div class="dash-top"><h2>DASHBOARD</h2><span class="hint">Team = full-time annotators</span><input type="date" id="dashDate" value="${day}"></div>
    <div class="stats">
-     <div class="stat"><div class="k">Completed</div><div class="v" style="color:var(--acc)">${o.done.toLocaleString()}</div><div class="sub">episodes done</div></div>
-     <div class="stat s-pend"><div class="k">Remaining</div><div class="v" style="color:var(--amber)">${o.pending.toLocaleString()}</div><div class="sub">pending</div></div>
-     <div class="stat s-bots"><div class="k">Total episodes</div><div class="v" style="color:var(--blue)">${o.total.toLocaleString()}</div><div class="sub">all time</div></div>
-     <div class="stat" style="border-top-color:var(--purple)"><div class="k">Total hours</div><div class="v" style="color:var(--purple)">${fmtHrs(totalHours)}</div><div class="sub">clocked · full-time</div></div>
+     <div class="stat" style="--sc:var(--acc)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span><div class="k">Completed</div><div class="v">${o.done.toLocaleString()}</div><div class="sub">episodes done</div></div>
+     <div class="stat" style="--sc:var(--amber)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></span><div class="k">Remaining</div><div class="v">${o.pending.toLocaleString()}</div><div class="sub">pending</div></div>
+     <div class="stat" style="--sc:var(--blue)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span><div class="k">Total episodes</div><div class="v">${o.total.toLocaleString()}</div><div class="sub">all time</div></div>
+     <div class="stat" style="--sc:var(--purple)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div class="k">Total hours</div><div class="v">${fmtHrs(totalHours)}</div><div class="sub">clocked · full-time</div></div>
    </div>
-   <div class="dash-periods">
-     ${pcard('DAILY · '+prettyDate(day),dEps,dHrs,dEph)}
-     ${pcard('WEEKLY · '+isoWeekRange(day)[0].slice(5)+'–'+isoWeekRange(day)[1].slice(5),wEps,wHrs,wEph)}
-     ${pcard('MONTHLY · '+day.slice(0,7),mEps,mHrs,mEph)}
+   <div class="trio">
+     <div class="pp"><div class="pt2">Daily <span class="pth2">· ${prettyDate(day)}</span></div><div class="pg">${ps('Episodes',dEps.toLocaleString())+ps('Hours',fmtHrs(dHrs))+ps('EPH',dEph)}</div></div>
+     <div class="pp"><div class="pt2">Weekly <span class="pth2">· ${wr[0].slice(5)} – ${wr[1].slice(5)}</span></div><div class="pg">${ps('Episodes',wEps.toLocaleString())+ps('Hours',fmtHrs(wHrs))+ps('EPH',wEph)}</div></div>
+     <div class="pp"><div class="pt2">Monthly <span class="pth2">· ${day.slice(0,7)}</span></div><div class="pg">${ps('Episodes',mEps.toLocaleString())+ps('Hours',fmtHrs(mHrs))+ps('EPH',mEph)}</div></div>
    </div>
    <div class="dash-main">
-     <div class="dash-charts">
-       <div class="chart-card"><div class="ct">TEAM WEEKLY PERFORMANCE</div><div class="cs">episodes / week · full-time</div>${svgBars(weeklySeries(day))}</div>
-       <div class="chart-card"><div class="ct">TEAM WEEKLY ERROR TREND</div><div class="cs">QC error rate</div>${chartPlaceholder('Awaiting QC / error data')}</div>
-       <div class="chart-card"><div class="ct">TEAM MONTHLY PERFORMANCE</div><div class="cs">episodes / month · full-time</div>${svgBars(monthlySeries(day))}</div>
-       <div class="chart-card"><div class="ct">TEAM MONTHLY ERROR TREND</div><div class="cs">QC error rate</div>${chartPlaceholder('Awaiting QC / error data')}</div>
+     <div class="dash-left">
+       <div class="chart-row">
+         <div class="panel"><div class="pt">Team Weekly Performance <span class="pth">avg ${wkAvg.toLocaleString()} eps/wk</span></div><div class="chbox"><canvas id="cv-wperf"></canvas></div></div>
+         <div class="panel"><div class="pt">Team Weekly Error Trend <span class="pth">QC error rate</span></div><div class="chbox"><div class="chart-empty">AWAITING QC / ERROR DATA</div></div></div>
+       </div>
+       <div class="chart-row">
+         <div class="panel"><div class="pt">Team Monthly Performance <span class="pth">${trend?trend+' · ':''}avg ${moAvg.toLocaleString()} eps/mo</span></div><div class="chbox"><canvas id="cv-mperf"></canvas></div></div>
+         <div class="panel"><div class="pt">Team Monthly Error Trend <span class="pth">QC error rate</span></div><div class="chbox"><div class="chart-empty">AWAITING QC / ERROR DATA</div></div></div>
+       </div>
      </div>
-     <div class="kpi-wrap">
-     <div class="kpi-head"><h3>KPI STATUS</h3><span class="kh">D: ${DAILY_TARGET} · W: ${WEEKLY_TARGET} eps</span><span class="kh" style="margin-left:auto">${prettyDate(day)}</span></div>
-     ${kpi.map((k,i)=>{const dp=Math.min(100,Math.round(k.d/DAILY_TARGET*100));const wp=Math.min(100,Math.round(k.w/WEEKLY_TARGET*100));const hit=k.d>=DAILY_TARGET;
-       return `<div class="kpi-row ${hit?'done':''}"><div class="kpi-rank">${i+1}</div>
-         <div class="kpi-name">${esc(k.p)}${hit?'<span class="party">🎉</span>':''}</div>
-         <div class="kpi-metric"><div class="km-top"><span>DAILY</span><b>${k.d}/${DAILY_TARGET}</b></div><div class="kbar"><i class="${dp>=100?'full':''}" style="width:${dp}%"></i></div></div>
-         <div class="kpi-metric"><div class="km-top"><span>WEEKLY</span><b>${k.w}/${WEEKLY_TARGET}</b></div><div class="kbar"><i class="${wp>=100?'full':''}" style="width:${wp}%"></i></div></div>
-       </div>`;}).join('')}
+     <div class="panel"><div class="pt">KPI Status <span class="pth">D: ${DAILY_TARGET} &nbsp;|&nbsp; W: ${WEEKLY_TARGET} eps</span></div>
+       <div class="kpi-list">
+       ${kpi.map((k,i)=>{const dp=Math.min(k.d/DAILY_TARGET*100,100),wp=Math.min(k.w/WEEKLY_TARGET*100,100);
+         const dc=dp>=100?'#4caf50':dp>=75?'#ffa726':'#ef5350';const wc=wp>=100?'#4caf50':wp>=75?'#ffa726':'#ef5350';const hit=k.d>=DAILY_TARGET;
+         return `<div class="kitem"><div class="krow1"><span class="krank">${i+1}</span><span class="kname">${esc(k.p)}</span>${hit?'<span class="party">🎉</span>':''}</div>
+           <div class="kmets">
+             <div class="km"><div class="kmt"><span>Daily</span><span style="color:${dc}">${k.d}/${DAILY_TARGET}</span></div><div class="kbarx"><i style="width:${dp}%;background:${dc}"></i></div></div>
+             <div class="km"><div class="kmt"><span>Weekly</span><span style="color:${wc}">${k.w}/${WEEKLY_TARGET}</span></div><div class="kbarx"><i style="width:${wp}%;background:${wc}"></i></div></div>
+           </div></div>`;}).join('')}
+       </div>
      </div>
    </div>`;
   app.querySelector('#dashDate').addEventListener('change',e=>{dashDate=e.target.value;renderDashboard();});
+  destroyCharts();
+  if(typeof Chart!=='undefined'){
+    const c1=document.getElementById('cv-wperf');
+    if(c1&&S.W.data.length)_charts.push(new Chart(c1,{type:'bar',data:{labels:S.W.labels,datasets:[{data:S.W.data,backgroundColor:S.W.colors,borderColor:S.W.colors.map(c=>c.replace('.9','1').replace('.7','1')),borderWidth:2,borderRadius:6}]},options:chartOpts()}));
+    const c2=document.getElementById('cv-mperf');
+    if(c2&&S.M.data.length)_charts.push(new Chart(c2,{type:'bar',data:{labels:S.M.labels,datasets:[{data:S.M.data,backgroundColor:S.M.colors,borderColor:S.M.colors,borderWidth:2,borderRadius:6}]},options:chartOpts()}));
+  }
 }
 
 function tlHM(iso){if(!iso||iso.indexOf('T')<0)return '—';const p=iso.split('T')[1].split(':');let hh=+p[0];const ap=hh>=12?'pm':'am';hh=hh%12||12;return hh+':'+p[1]+' '+ap;}
 function renderTimeLog(){
+  const TLLIM=150;
   const all=state.timeEntries.slice();
   const people=[...new Set(all.map(t=>t.person))].sort();
-  const list=(tlFilter?all.filter(t=>t.person===tlFilter):all).sort((a,b)=>((b.day+(b.start||''))<(a.day+(a.start||''))?-1:1));
+  const filtered=(tlFilter?all.filter(t=>t.person===tlFilter):all).sort((a,b)=>((b.day+(b.start||''))<(a.day+(a.start||''))?-1:1));
+  const list=filtered.slice(0,TLLIM);
+  const annOpts=t=>state.annotators.map(a=>`<option ${a===t.person?'selected':''}>${esc(a)}</option>`).join('')+(state.annotators.includes(t.person)||!t.person?'':`<option selected>${esc(t.person)}</option>`);
   app.innerHTML=`
    <div class="tl-clock">
      ${activeShift
        ? `<span class="clk-live"></span><div class="tl-clk-info"><div class="tl-clk-name">${esc(activeShift.person)}</div><div class="tl-clk-sub">On the clock since ${tlHM(new Date(activeShift.start).toISOString())}</div></div><div class="clk-time" id="clockElapsed" style="margin-left:auto">${fmtHM((Date.now()-activeShift.start)/60000)}</div><button class="btn btn-danger" id="clockOutBtn">Clock out</button>`
-       : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-soft)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="tl-clk-name">Start a shift</span><select id="clockWho" style="margin-left:auto"><option value="">Select name…</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select><button class="btn btn-primary" id="clockInBtn">Clock in</button>`}
+       : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="tl-clk-name">Start a shift</span><select id="clockWho" style="margin-left:auto"><option value="">Select name…</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select><button class="btn btn-primary" id="clockInBtn">Clock in</button>`}
    </div>
-   <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${list.length.toLocaleString()} records</span>
-     <select id="tlFilterSel" style="margin-left:auto;width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
-   <div class="tl-table"><div class="tl-cols"><div>Date</div><div>Annotator</div><div>Time In</div><div>Time Out</div><div>Hours</div></div>
-     ${list.slice(0,3000).map(t=>`<div class="tl-row"><div>${prettyShort(t.day)}</div><div class="tl-person">${esc(t.person)}</div><div>${tlHM(t.start)}</div><div>${tlHM(t.end)}</div><div class="tl-hrs">${(Math.round((t.minutes/60)*10)/10).toFixed(1)}</div></div>`).join('')}
+   <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${filtered.length>TLLIM?' · showing '+TLLIM:''}</span>
+     <button class="btn btn-sm" id="tlAdd" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>
+     <select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+   <div class="tl-table" id="tlTable"><div class="tl-cols"><div>Date</div><div>Annotator</div><div>Time In</div><div>Time Out</div><div>Hours</div><div></div></div>
+     ${list.map(t=>`<div class="tl-row" data-id="${t.id}">
+        <div><input type="date" class="tl-in" data-f="day" value="${t.day}"></div>
+        <div><select class="tl-in tl-person" data-f="person">${annOpts(t)}</select></div>
+        <div><input type="time" class="tl-in" data-f="in" value="${hhmm(t.start)}"></div>
+        <div><input type="time" class="tl-in" data-f="out" value="${hhmm(t.end)}"></div>
+        <div><input type="number" step="0.1" min="0" class="tl-in tl-hrs" data-f="hrs" value="${(t.minutes/60).toFixed(1)}"></div>
+        <div><button class="trash" data-del="${t.id}" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></div>
+      </div>`).join('')}
    </div>`;
   const ci=app.querySelector('#clockInBtn');if(ci)ci.addEventListener('click',()=>{const w=app.querySelector('#clockWho').value;if(!w){toast('Pick your name first');return;}clockIn(w);});
   const co=app.querySelector('#clockOutBtn');if(co)co.addEventListener('click',clockOut);
   app.querySelector('#tlFilterSel').addEventListener('change',e=>{tlFilter=e.target.value;renderTimeLog();});
+  app.querySelector('#tlAdd').addEventListener('click',addTimeEntry);
+  const tbl=app.querySelector('#tlTable');
+  tbl.addEventListener('change',e=>{const inp=e.target.closest('.tl-in');if(!inp)return;const row=inp.closest('[data-id]');const t=state.timeEntries.find(x=>x.id===row.dataset.id);if(!t)return;const f=inp.dataset.f;
+    if(f==='day'){const nd=inp.value;if(t.start)t.start=nd+'T'+hhmm(t.start);if(t.end)t.end=nd+'T'+hhmm(t.end);t.day=nd;}
+    else if(f==='person'){t.person=inp.value;}
+    else if(f==='in'){t.start=t.day+'T'+inp.value;const m=minutesBetween(t.start,t.end);if(m!=null)t.minutes=m;}
+    else if(f==='out'){t.end=t.day+'T'+inp.value;const m=minutesBetween(t.start,t.end);if(m!=null)t.minutes=m;}
+    else if(f==='hrs'){t.minutes=Math.round(parseFloat(inp.value||'0')*60);}
+    save();pushEntry(t);
+    if(f==='in'||f==='out'){const hc=row.querySelector('[data-f="hrs"]');if(hc)hc.value=(t.minutes/60).toFixed(1);}
+  });
+  tbl.addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;deleteTimeEntry(b.dataset.del);renderTimeLog();});
 }
 function isoWeekNum(iso){const d=new Date(iso+'T00:00:00');const t=new Date(d);t.setDate(d.getDate()+3-((d.getDay()+6)%7));const w1=new Date(t.getFullYear(),0,4);return 1+Math.round(((t-w1)/86400000-3+((w1.getDay()+6)%7))/7);}
 function weeklySeries(day){const map={};state.episodes.forEach(e=>{if(e.done&&e.dateLabeled&&FULLTIME.includes(e.assignee)){const mon=isoWeekRange(e.dateLabeled)[0];map[mon]=(map[mon]||0)+1;}});const cur=isoWeekRange(day)[0];const weeks=Object.keys(map).filter(w=>w<=cur).sort().slice(-16);return weeks.map(w=>({label:'W'+isoWeekNum(w),value:map[w],hot:w===cur}));}
-function monthlySeries(day){const map={};state.episodes.forEach(e=>{if(e.done&&e.dateLabeled&&FULLTIME.includes(e.assignee)){const m=e.dateLabeled.slice(0,7);map[m]=(map[m]||0)+1;}});const cur=day.slice(0,7);return Object.keys(map).sort().map(m=>({label:m.slice(5),value:map[m],hot:m===cur}));}
+function monthlySeries(day){const map={};state.episodes.forEach(e=>{if(e.done&&e.dateLabeled&&FULLTIME.includes(e.assignee)){const m=e.dateLabeled.slice(0,7);map[m]=(map[m]||0)+1;}});const cur=day.slice(0,7);return Object.keys(map).sort().map(m=>({label:m.slice(5),value:map[m],color:MONTHCOLORS[m.slice(5,7)]||'#3b82f6',hot:m===cur}));}
 function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
-function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(300,n*30),H=180,padB=18,padT=8,padX=6;const max=Math.max(1,...series.map(s=>s.value));const slot=(W-padX*2)/n;const bw=Math.min(22,slot*0.62);let o='';series.forEach((s,i)=>{const cx=padX+slot*i+slot/2;const bh=Math.max(1,(H-padB-padT)*(s.value/max));const y=H-padB-bh;o+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${s.hot?'var(--acc)':'#3b82f6'}"><title>${s.label}: ${s.value}</title></rect><text x="${cx.toFixed(1)}" y="${H-5}" font-size="7" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="180" preserveAspectRatio="xMidYMax meet">${o}</svg>`;}
+function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
+function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
+function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
 function render(){ if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
