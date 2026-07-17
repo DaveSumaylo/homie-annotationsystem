@@ -379,6 +379,12 @@
   @keyframes bootslide{0%{left:-40%}100%{left:100%}}
   .boot-sub{font-size:10px;font-weight:700;color:var(--ink-faint);letter-spacing:2px}
   .tl-ro{font-size:12px;padding:2px 6px}
+  .myq{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--acc-line);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+  .myq-t{font-weight:800;font-size:12px;color:var(--acc);letter-spacing:.5px}
+  .myq-n{font-size:11px;font-weight:800;color:var(--acc);background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:14px;padding:2px 9px}
+  .myq-chip{font-size:11px;font-variant-numeric:tabular-nums;text-transform:none;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:16px;padding:4px 10px;color:var(--ink);transition:.12s}
+  .myq-chip:hover{border-color:var(--acc);color:var(--acc)}
+  .myq-empty{font-size:12px;color:var(--ink-soft)}
   .userchip .icon-btn{width:30px;height:30px}
   .tl-table{margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
   .tl-cols,.tl-row{display:grid;grid-template-columns:1.25fr 1.15fr .95fr .95fr .7fr 42px}
@@ -454,7 +460,7 @@ const SEED={
   bots:['Alpha','Bravo','Charlie','Delta','Echo','Fox','Godzilla','Hugo','Igor','Jackie','Kilo','Llama'],
   annotators:['Mark','RJ','Axl','Cris','Alwin','Sharbell','Ata','Sean','Kent','Jerome','Mark Aaron','Darius'],
   taskCodes:['TM19','TM53','TM51','TM52','TM02','TM30','TM03','TM05','TM27','ST01','ST02','ST03'],
-  assignments:{}, dayOverrides:{}, episodes:[]
+  queueSize:5, assignments:{}, dayOverrides:{}, episodes:[]
 };
 const BOT_ICONS={Alpha:'🤖',Bravo:'🦾',Charlie:'🐎',Delta:'🔺',Echo:'📡',Fox:'🦊',Godzilla:'🦖',Hugo:'🎩',Igor:'🧪',Jackie:'🐆',Kilo:'🥋',Llama:'🦙'};
 const ICON_POOL=['🛰️','🚀','⚙️','🧩','🎯','⭐','🔋','📦','🧲','🛸','🕹️','🔩'];
@@ -601,7 +607,7 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
 function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,createdAt:Date.now()};}
 function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0);}
-function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides});}
+function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||5});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
 async function cloudCount(){const r=await sbFetch('episodes?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
@@ -612,7 +618,7 @@ async function cloudLoad(){
   epWatermark=maxWm(rows,null);
   state.episodes=rows.map(rowToEp);
   const meta=await cloudLoadMeta();
-  if(meta){if(Array.isArray(meta.bots)&&meta.bots.length)state.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)state.taskCodes=meta.taskCodes;if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;}
+  if(meta){if(Array.isArray(meta.bots)&&meta.bots.length)state.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)state.taskCodes=meta.taskCodes;if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;if(typeof meta.queueSize==='number')state.queueSize=meta.queueSize;}
   try{const rawT=await cloudLoadEntries();tWatermark=maxWm(rawT,null);
     const cloudT=rawT.map(r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day}));
     const cids=new Set(cloudT.map(t=>t.id));
@@ -626,7 +632,7 @@ async function cloudLoad(){
 }
 async function cloudChunkUpsert(rows){for(let i=0;i<rows.length;i+=500){const chunk=rows.slice(i,i+500);await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 async function cloudChunkDelete(ids){for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('episodes?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}}
-async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides}}])});}
+async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||5}}])});}
 
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
@@ -691,6 +697,7 @@ async function cloudPoll(){
         if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)tmp.taskCodes=meta.taskCodes;
         if(meta.assignments)tmp.assignments=meta.assignments;
         if(meta.dayOverrides)tmp.dayOverrides=meta.dayOverrides;
+        tmp.queueSize=(typeof meta.queueSize==='number')?meta.queueSize:(state.queueSize||5);
         if(JSON.stringify(tmp)!==syncedMeta){Object.assign(state,tmp);syncedMeta=metaSig();dirty=true;}
       }
     }catch(e){console.error('poll meta',e);}
@@ -739,6 +746,31 @@ async function cloudPoll(){
   }catch(e){console.error('poll',e);}
   polling=false;
 }
+/* ---------- Phase 1: Assignment Engine (client bridge; logic lives in Postgres RPC) ---------- */
+let engineOk=true;
+async function sbRpc(fn,args){const r=await sbFetch('rpc/'+fn,{method:'POST',headers:sbHeaders(),body:JSON.stringify(args||{})});return await r.json();}
+function myAnnotatorName(){if(!profile)return null;const n=((profile.display_name||profile.name||'')+'').trim();if(!n)return null;const hit=state.annotators.find(a=>a.toLowerCase()===n.toLowerCase());return hit||null;}
+function mergeEngineRows(rows){if(!Array.isArray(rows)||!rows.length)return false;const idx=new Map(state.episodes.map(e=>[e.id,e]));let ch=false;
+  for(const r of rows){const inc=rowToEp(r);const cur=idx.get(inc.id);
+    if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);}else{Object.assign(cur,inc);}
+    syncedEps.set(inc.id,epSig(inc));ch=true;}
+  if(ch)persistLocal();return ch;}
+function engineFail(e){const m=String((e&&e.message)||'');
+  if(m.indexOf('404')>=0||m.toLowerCase().indexOf('function')>=0){if(engineOk){engineOk=false;toast('ASSIGNMENT ENGINE OFF — run the Phase 1 SQL');}}
+  else console.error('engine',e);}
+async function engineFillQueue(){
+  if(!CLOUD||!session||!engineOk||isManager())return;
+  const who=myAnnotatorName();if(!who)return;
+  try{const rows=await sbRpc('fill_queue',{p_user:who,p_queue:state.queueSize||5});
+    if(mergeEngineRows(rows)){toast('MY QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
+  }catch(e){engineFail(e);}}
+async function engineOnComplete(epId){
+  if(!CLOUD||!session||!engineOk)return;
+  const e=state.episodes.find(x=>x.id===epId);
+  if(!e||!e.assignee||!state.annotators.includes(e.assignee))return;
+  try{const rows=await sbRpc('complete_episode',{p_id:epId,p_queue:state.queueSize||5});
+    if(mergeEngineRows(rows)&&!isTypingNow())render();
+  }catch(err){engineFail(err);}}
 async function cloudMigrate(){if(!CLOUD)return;syncedEps=new Map();syncedMeta='';await cloudFlush();}
 async function cloudConnect(url,key){
   SB={url,key};CLOUD=true;saveSbConfig();setSyncStatus('sync');
@@ -1303,7 +1335,7 @@ function wireDetail(bot,getDay,rerender){
     if(t.dataset.task!==undefined){setTaskCode(t.dataset.task,t.value);return;}
     if(t.dataset.asg!==undefined){assignEpisode(t.dataset.asg,t.value);recolorAsg(t);return;}
     if(t.dataset.date!==undefined){setDate(t.dataset.date,t.value);return;}
-    if(t.dataset.done!==undefined){toggleDone(t.dataset.done,t.checked);rerender();return;}
+    if(t.dataset.done!==undefined){toggleDone(t.dataset.done,t.checked);if(t.checked)engineOnComplete(t.dataset.done);rerender();return;}
   });
   dp.addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;deleteEpisode(b.dataset.del);selectedIds.delete(b.dataset.del);rerender();});
 }
@@ -1313,6 +1345,7 @@ function renderAnnotator(){
   keepTreeScroll('anno');
   const bots=state.bots.filter(b=>!botFilter||b===botFilter);
   app.innerHTML=`
+    ${(!isManager()&&myAnnotatorName())?myQueueBar():''}
     <div class="tree-layout">
       <div class="tree-panel">
         <div class="tree-filter"><select id="botFilter"><option value="">ALL EPISODES</option>${state.bots.map(b=>`<option value="${esc(b)}" ${b===botFilter?'selected':''}>${botIcon(b)}  ${esc(b)}</option>`).join('')}</select></div>
@@ -1325,7 +1358,16 @@ function renderAnnotator(){
   app.querySelectorAll('[data-tbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.tbot;botOpen(b)?collapsedBots.add(b):collapsedBots.delete(b);renderAnnotator();}));
   app.querySelectorAll('[data-tmonth]').forEach(el=>el.addEventListener('click',()=>{const [b,m]=el.dataset.tmonth.split('|');const k=b+'|'+m;openMonths.has(k)?openMonths.delete(k):openMonths.add(k);renderAnnotator();}));
   app.querySelectorAll('[data-tday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.tday.split('|');sel={bot:b,day:d};selectedIds.clear();addOpen=false;renderAnnotator();}));
+  app.querySelectorAll('[data-q]').forEach(el=>el.addEventListener('click',()=>{const e=state.episodes.find(x=>x.id===el.dataset.q);if(!e)return;const d=dayOf(e);botFilter='';sel={bot:e.bot,day:d};collapsedBots.delete(e.bot);openMonths.add(e.bot+'|'+(d==='Undated'?'Undated':d.slice(0,7)));selectedIds.clear();renderAnnotator();}));
   wireDetail(sel.bot,()=>sel.day,renderAnnotator);
+}
+function myQueueBar(){
+  const who=myAnnotatorName();const cap=state.queueSize||5;
+  const q=state.episodes.filter(e=>e.assignee===who&&!e.done).sort((a,b)=>a.name<b.name?-1:1);
+  return `<div class="myq"><span class="myq-t">My Queue</span><span class="myq-n">${q.length}/${cap}</span>
+    ${q.length?q.slice(0,12).map(e=>`<button class="myq-chip" data-q="${e.id}" title="${esc(e.bot)} · ${esc(e.name)}">${esc(e.name.replace('episode_',''))}</button>`).join('')
+      :`<span class="myq-empty">No waiting episodes — all caught up 🎉</span>`}
+  </div>`;
 }
 function treeBot(bot){
   const bo=botOpen(bot);const total=episodesFor(bot).length;const months=monthsOf(bot);
@@ -1394,12 +1436,14 @@ function openSettings(){
         ${listEditor('bots','Bots','Editing here updates the manager grid and the annotator tree.')}
         ${listEditor('annotators','Annotators','The team who can be assigned to bots, dates, or episodes.')}
         ${listEditor('taskCodes','Task codes','Options in the task dropdown.')}
+        <div class="settings-block"><h4>Assignment engine</h4><p>Queue size per annotator — refilled automatically on login and on completion.</p><input type="number" id="qSize" min="1" max="50" value="${state.queueSize||5}" style="width:110px"></div>
         <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:16px"><button class="btn btn-danger btn-sm" id="resetAll">Reset all data</button><span style="font-size:11.5px;color:var(--ink-soft);margin-left:8px">Wipes episodes and assignments back to defaults.</span></div>
       </div></div></div></div>`;
   const sc=settingsModal.querySelector('#sScrim');sc.addEventListener('click',e=>{if(e.target===sc)closeSettings();});
   settingsModal.querySelector('#sClose').addEventListener('click',closeSettings);
   settingsModal.querySelector('#resetAll').addEventListener('click',()=>{if(confirm('Reset everything to defaults?')){state=structuredClone(SEED);save();closeSettings();sel={bot:null,day:null};drawerOpen.clear();collapsedBots.clear();openMonths.clear();render();toast('Reset to defaults');}});
   wireListEditors();wireCloud();
+  const qs=settingsModal.querySelector('#qSize');if(qs)qs.addEventListener('change',e=>{const v=Math.max(1,Math.min(50,parseInt(e.target.value||'5',10)||5));state.queueSize=v;e.target.value=v;save();toast('Queue size set to '+v);});
 }
 function closeSettings(){settingsModal.innerHTML='';}
 function listEditor(key,title,desc){return `<div class="settings-block" data-list="${key}"><h4>${title}</h4><p>${desc}</p>
@@ -1422,6 +1466,7 @@ async function enterApp(){
   render();
   startWallClock();
   hideBoot();
+  engineFillQueue();
   setInterval(cloudPoll,15000);
   window.addEventListener('focus',cloudPoll);
 }
