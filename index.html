@@ -549,6 +549,9 @@ function gridAsg(id,current){const c=current?annoColor(current):null;const style
 let SB=null, CLOUD=false;
 let syncedEps=new Map(), syncedMeta='';
 let syncedTimes=new Map();
+let epWatermark=null,tWatermark=null,polling=false,pollDisabled=false;
+let pendingEpDeletes=new Set();
+function maxWm(rows,cur){let m=cur;for(const r of rows){if(r.updated_at&&(!m||r.updated_at>m))m=r.updated_at;}return m;}
 function timeSig(t){return t.person+'|'+(t.start||'')+'|'+(t.end||'')+'|'+(t.minutes||0)+'|'+t.day;}
 let syncTimer=null, syncing=false, syncQueued=false;
 
@@ -605,10 +608,12 @@ async function cloudLoadAll(){const all=[];let from=0;const page=1000;while(true
 async function cloudLoadMeta(){try{const r=await sbFetch('app_meta?id=eq.1&select=data',{headers:sbHeaders()});const j=await r.json();return (j[0]&&j[0].data)||null;}catch(e){return null;}}
 async function cloudLoad(){
   const rows=await cloudLoadAll();
+  epWatermark=maxWm(rows,null);
   state.episodes=rows.map(rowToEp);
   const meta=await cloudLoadMeta();
   if(meta){if(Array.isArray(meta.bots)&&meta.bots.length)state.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)state.taskCodes=meta.taskCodes;if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;}
-  try{const cloudT=(await cloudLoadEntries()).map(r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day}));
+  try{const rawT=await cloudLoadEntries();tWatermark=maxWm(rawT,null);
+    const cloudT=rawT.map(r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day}));
     const cids=new Set(cloudT.map(t=>t.id));
     const localOnly=(state.timeEntries||[]).filter(t=>!cids.has(t.id)&&!deletedTimeIds.has(t.id));
     state.timeEntries=cloudT.concat(localOnly);
@@ -625,6 +630,7 @@ async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
   if(!CLOUD||!SB)return;
+  if(polling){clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,500);return;}
   if(syncing){syncQueued=true;return;}
   syncing=true;setSyncStatus('sync');
   try{
@@ -640,13 +646,95 @@ async function cloudFlush(){
     if(tChanged.length)await cloudUpsertEntries(tChanged);
     if(tRemoved.length)for(let i=0;i<tRemoved.length;i+=50){const chunk=tRemoved.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('time_entries?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}
     for(const e of changed)syncedEps.set(e.id,epSig(e));
-    for(const id of removed)syncedEps.delete(id);
+    for(const id of removed){syncedEps.delete(id);pendingEpDeletes.delete(id);}
     for(const t of tChanged)syncedTimes.set(t.id,timeSig(t));
     for(const id of tRemoved)syncedTimes.delete(id);
     setSyncStatus('synced');
   }catch(err){setSyncStatus('error',err.message);console.error(err);}
   syncing=false;
   if(syncQueued){syncQueued=false;scheduleCloudSync();}
+}
+function isTypingNow(){const a=document.activeElement;return !!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'));}
+function handlePollErr(e){const m=String((e&&e.message)||'');
+  if(m.indexOf('updated_at')>=0||m.indexOf('42703')>=0){if(!pollDisabled){pollDisabled=true;toast('Live sync needs an upgrade — run supabase_sync_upgrade.sql');}}
+  else console.error('poll',e);}
+async function fullEpisodeResync(){
+  const rows=await cloudLoadAll();epWatermark=maxWm(rows,epWatermark);
+  const cmap=new Map(rows.map(r=>[r.id,r]));
+  const pendEdits=new Map(state.episodes.filter(e=>cmap.has(e.id)&&epSig(e)!==syncedEps.get(e.id)).map(e=>[e.id,e]));
+  const keepAdds=state.episodes.filter(e=>!cmap.has(e.id)&&epSig(e)!==syncedEps.get(e.id));
+  state.episodes=rows.filter(r=>!pendingEpDeletes.has(r.id)).map(r=>pendEdits.get(r.id)||rowToEp(r)).concat(keepAdds);
+  syncedEps=new Map(rows.map(r=>{const e=rowToEp(r);return [e.id,epSig(e)];}));
+}
+async function fullTimeResync(){
+  const raw=await cloudLoadEntries();tWatermark=maxWm(raw,tWatermark);
+  const cmap=new Map(raw.map(r=>[r.id,r]));
+  const mapT=r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day});
+  const pendEdits=new Map(state.timeEntries.filter(t=>cmap.has(t.id)&&timeSig(t)!==syncedTimes.get(t.id)).map(t=>[t.id,t]));
+  const keepAdds=state.timeEntries.filter(t=>!cmap.has(t.id)&&timeSig(t)!==syncedTimes.get(t.id)&&!deletedTimeIds.has(t.id));
+  state.timeEntries=raw.filter(r=>!deletedTimeIds.has(r.id)).map(r=>pendEdits.get(r.id)||mapT(r)).concat(keepAdds);
+  syncedTimes=new Map(raw.map(r=>[r.id,timeSig(mapT(r))]));
+}
+async function cloudPoll(){
+  if(!CLOUD||!session||pollDisabled||polling||syncing)return;
+  polling=true;
+  try{
+    let dirty=false;
+    // meta (tiny single row): adopt cloud version only if we have no unpushed meta changes
+    try{const meta=await cloudLoadMeta();
+      if(meta&&metaSig()===syncedMeta){
+        const tmp={bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides};
+        if(Array.isArray(meta.bots)&&meta.bots.length)tmp.bots=meta.bots;
+        if(Array.isArray(meta.annotators)&&meta.annotators.length)tmp.annotators=meta.annotators;
+        if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)tmp.taskCodes=meta.taskCodes;
+        if(meta.assignments)tmp.assignments=meta.assignments;
+        if(meta.dayOverrides)tmp.dayOverrides=meta.dayOverrides;
+        if(JSON.stringify(tmp)!==syncedMeta){Object.assign(state,tmp);syncedMeta=metaSig();dirty=true;}
+      }
+    }catch(e){console.error('poll meta',e);}
+    // episodes: incremental by updated_at, then count check for deletions
+    try{
+      const r=await sbFetch('episodes?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(epWatermark||'1970-01-01'),{headers:sbHeaders()});
+      const rows=await r.json();
+      if(rows.length){
+        epWatermark=maxWm(rows,epWatermark);
+        const idx=new Map(state.episodes.map(e=>[e.id,e]));
+        for(const raw of rows){const inc=rowToEp(raw);
+          if(pendingEpDeletes.has(inc.id)){syncedEps.set(inc.id,epSig(inc));continue;}
+          const cur=idx.get(inc.id);
+          if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);syncedEps.set(inc.id,epSig(inc));dirty=true;}
+          else{const pending=epSig(cur)!==syncedEps.get(cur.id);
+            if(!pending&&epSig(cur)!==epSig(inc)){Object.assign(cur,inc);dirty=true;}
+            syncedEps.set(inc.id,epSig(inc));}
+        }
+      }
+      const n=await cloudCount();
+      if(n!==syncedEps.size){await fullEpisodeResync();dirty=true;}
+    }catch(e){handlePollErr(e);}
+    // time entries: same pattern
+    try{
+      const r=await sbFetch('time_entries?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(tWatermark||'1970-01-01'),{headers:sbHeaders()});
+      const rows=await r.json();
+      const mapT=x=>({id:x.id,person:x.person,start:x.start||'',end:x.end||'',minutes:x.minutes||0,day:x.day});
+      if(rows.length){
+        tWatermark=maxWm(rows,tWatermark);
+        const idx=new Map(state.timeEntries.map(t=>[t.id,t]));
+        for(const raw of rows){const inc=mapT(raw);
+          if(deletedTimeIds.has(inc.id)){syncedTimes.set(inc.id,timeSig(inc));continue;}
+          const cur=idx.get(inc.id);
+          if(!cur){state.timeEntries.push(inc);idx.set(inc.id,inc);syncedTimes.set(inc.id,timeSig(inc));dirty=true;}
+          else{const pending=timeSig(cur)!==syncedTimes.get(cur.id);
+            if(!pending&&timeSig(cur)!==timeSig(inc)){Object.assign(cur,inc);dirty=true;}
+            syncedTimes.set(inc.id,timeSig(inc));}
+        }
+      }
+      const rc=await sbFetch('time_entries?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});
+      const cr=rc.headers.get('content-range')||'0-0/0';const mm=cr.match(/\/(\d+)$/);const tn=mm?+mm[1]:0;
+      if(tn!==syncedTimes.size){await fullTimeResync();dirty=true;}
+    }catch(e){handlePollErr(e);}
+    if(dirty){persistLocal();if(!isTypingNow())render();}
+  }catch(e){console.error('poll',e);}
+  polling=false;
 }
 async function cloudMigrate(){if(!CLOUD)return;syncedEps=new Map();syncedMeta='';await cloudFlush();}
 async function cloudConnect(url,key){
@@ -772,7 +860,7 @@ function setName(id,v){const e=state.episodes.find(x=>x.id===id);if(e){e.name=v.
 function setTaskCode(id,c){const e=state.episodes.find(x=>x.id===id);if(e){e.taskCode=c;save();}}
 function setDate(id,v){const e=state.episodes.find(x=>x.id===id);if(e){e.dateLabeled=v;save();}}
 function toggleDone(id,val){const e=state.episodes.find(x=>x.id===id);if(!e)return;e.done=(val!==undefined)?val:!e.done;if(e.done&&!e.dateLabeled)e.dateLabeled=todayISO();save();}
-function deleteEpisode(id){state.episodes=state.episodes.filter(x=>x.id!==id);delete state.dayOverrides[id];save();}
+function deleteEpisode(id){pendingEpDeletes.add(id);state.episodes=state.episodes.filter(x=>x.id!==id);delete state.dayOverrides[id];save();}
 function bulkSetTask(ids,code){state.episodes.forEach(e=>{if(ids.has(e.id))e.taskCode=code;});save();}
 function bulkSetAssignee(ids,a){state.episodes.forEach(e=>{if(ids.has(e.id))e.assignee=a;});save();}
 function bulkMoveBot(ids,bot){state.episodes.forEach(e=>{if(ids.has(e.id))e.bot=bot;});save();}
@@ -1327,6 +1415,8 @@ async function enterApp(){
   render();
   startWallClock();
   hideBoot();
+  setInterval(cloudPoll,15000);
+  window.addEventListener('focus',cloudPoll);
 }
 function showLogin(){
   hideBoot();
