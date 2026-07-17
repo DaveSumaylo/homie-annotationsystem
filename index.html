@@ -360,6 +360,17 @@
   .wc-date{font-size:11px;color:var(--ink-soft);font-weight:600;margin-top:2px}
   .tl-row.open{box-shadow:inset 3px 0 0 var(--acc)}
   .tl-row.open .tl-hrs{color:var(--ink-faint)}
+  #loginScreen{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center}
+  .login-card{width:min(360px,92vw);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px 26px;display:flex;flex-direction:column;gap:11px;align-items:center;box-shadow:var(--shadow-lg)}
+  .login-logo{width:64px;height:64px;margin-bottom:2px}
+  .login-title{font-size:19px;font-weight:800;color:var(--acc);letter-spacing:.5px}
+  .login-sub{font-size:10.5px;color:var(--ink-faint);font-weight:700;letter-spacing:.8px;margin-bottom:8px}
+  .login-card input{width:100%;text-transform:none}
+  .login-err{font-size:12px;color:#fca5a5;min-height:16px;font-weight:600;text-transform:none}
+  .userchip{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:4px 4px 4px 12px}
+  .uc-name{font-size:12.5px;font-weight:700;text-transform:none}
+  .uc-role{font-size:9px;font-weight:800;color:var(--acc);background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:12px;padding:2px 8px}
+  .userchip .icon-btn{width:30px;height:30px}
   .tl-table{margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
   .tl-cols,.tl-row{display:grid;grid-template-columns:1.25fr 1.15fr .95fr .95fr .7fr 42px}
   .tl-cols{background:var(--surface-3);font-size:10px;font-weight:800;letter-spacing:.4px;color:var(--ink-faint);border-bottom:1px solid var(--border)}
@@ -379,6 +390,17 @@
 </style>
 </head>
 <body>
+<div id="loginScreen" style="display:none">
+  <div class="login-card">
+    <div class="brand-mark login-logo"><img id="loginLogo" alt="Project Homie"></div>
+    <div class="login-title">PROJECT HOMIE</div>
+    <div class="login-sub">ANNOTATION SYSTEM · SIGN IN</div>
+    <input type="email" id="loginEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password">
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn btn-primary" id="loginBtn" style="width:100%;justify-content:center">Sign in</button>
+  </div>
+</div>
 
 <div class="topbar">
   <div class="topbar-inner">
@@ -388,10 +410,11 @@
     </div>
     <div class="modeswitch" id="modeswitch">
       <button data-mode="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
-      <button data-mode="manager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
+      <button data-mode="manager" id="tabManager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
       <button data-mode="annotator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Annotator</button>
       <button data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
+    <div class="userchip" id="userChip" style="display:none"><span class="uc-name" id="userName"></span><span class="uc-role" id="userRole"></span><button class="icon-btn" id="btnSignOut" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button></div>
     <span id="syncDot" class="syncdot off" title="Local only — not synced to cloud"></span>
     <button class="icon-btn" id="btnSettings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
   </div>
@@ -408,6 +431,11 @@
    Manager = setup (paste + assign). Annotator = tree browser, all records,
    every field editable. To move to Supabase: swap load()/save().
    ========================================================================= */
+/* ============ SUPABASE CONFIG ============
+   Paste your project URL and anon public key here (same values
+   as Settings -> Cloud sync). Required for team login.        */
+const SB_FIXED={url:'',key:''};
+/* ========================================= */
 const KEY='projectHomie.v1';
 const CHEVSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg>';
 const CALSVG='<svg class="cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
@@ -512,11 +540,47 @@ let SB=null, CLOUD=false;
 let syncedEps=new Map(), syncedMeta='';
 let syncTimer=null, syncing=false, syncQueued=false;
 
-function loadSbConfig(){try{const c=JSON.parse(localStorage.getItem('projectHomie.sb')||'null');if(c&&c.url&&c.key){SB=c;CLOUD=true;}}catch(e){}}
+function loadSbConfig(){if(SB_FIXED.url&&SB_FIXED.key){SB={url:SB_FIXED.url,key:SB_FIXED.key};CLOUD=true;return;}try{const c=JSON.parse(localStorage.getItem('projectHomie.sb')||'null');if(c&&c.url&&c.key){SB=c;CLOUD=true;}}catch(e){}}
 function saveSbConfig(){localStorage.setItem('projectHomie.sb',JSON.stringify(SB||{}));}
-function sbHeaders(extra){return Object.assign({'apikey':SB.key,'Authorization':'Bearer '+SB.key,'Content-Type':'application/json'},extra||{});}
+let session=null; try{session=JSON.parse(localStorage.getItem('projectHomie.session')||'null');}catch(e){}
+let me={role:'annotator',name:''};
+function saveSession(){if(session)localStorage.setItem('projectHomie.session',JSON.stringify(session));else localStorage.removeItem('projectHomie.session');}
+function sbHeaders(extra){return Object.assign({'apikey':SB.key,'Authorization':'Bearer '+((session&&session.access_token)||SB.key),'Content-Type':'application/json'},extra||{});}
+async function authSignIn(email,password){
+  const r=await fetch(SB.url.replace(/\/+$/,'')+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':SB.key,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+  const j=await r.json();
+  if(!r.ok)throw new Error(j.error_description||j.msg||('Sign-in failed ('+r.status+')'));
+  session={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:(j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600)),user:{id:j.user.id,email:j.user.email}};
+  saveSession();return session;
+}
+async function authRefresh(){
+  if(!session||!session.refresh_token)throw new Error('No session');
+  const r=await fetch(SB.url.replace(/\/+$/,'')+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SB.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});
+  const j=await r.json();
+  if(!r.ok){session=null;saveSession();throw new Error(j.error_description||j.msg||'Session expired');}
+  session={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:(j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600)),user:session.user};
+  saveSession();return session;
+}
+async function ensureFreshSession(){if(!session)return false;const left=session.expires_at-Math.floor(Date.now()/1000);if(left>120)return true;try{await authRefresh();return true;}catch(e){return false;}}
+function authSignOut(){session=null;saveSession();me={role:'annotator',name:''};location.reload();}
+async function fetchProfile(){
+  try{const r=await sbFetch('profiles?id=eq.'+session.user.id+'&select=display_name,role',{headers:sbHeaders()});const j=await r.json();
+    if(j[0]){me={role:j[0].role||'annotator',name:j[0].display_name||session.user.email};return;}}catch(e){console.error(e);}
+  me={role:'annotator',name:(session&&session.user.email)||''};
+}
+function isManager(){return me.role==='manager';}
+function applyRole(){
+  const tm=document.getElementById('tabManager');if(tm)tm.style.display=isManager()?'':'none';
+  const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
+  const uc=document.getElementById('userChip');
+  if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
+  if(!isManager()&&mode==='manager'){mode='dashboard';document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode==='dashboard'));}
+}
+setInterval(()=>{if(CLOUD&&session)ensureFreshSession();},60000);
 function sbBase(){return SB.url.replace(/\/+$/,'')+'/rest/v1/';}
-async function sbFetch(path,opts){const r=await fetch(sbBase()+path,opts);if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Supabase '+r.status+' '+t.slice(0,160));}return r;}
+async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
+  if(r.status===401&&session){try{await authRefresh();const o2=Object.assign({},opts);o2.headers=Object.assign({},opts&&opts.headers,{'Authorization':'Bearer '+session.access_token});r=await fetch(sbBase()+path,o2);}catch(e){}}
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Supabase '+r.status+' '+t.slice(0,160));}return r;}
 
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
 function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,createdAt:Date.now()};}
@@ -563,12 +627,15 @@ async function cloudFlush(){
 async function cloudMigrate(){if(!CLOUD)return;syncedEps=new Map();syncedMeta='';await cloudFlush();}
 async function cloudConnect(url,key){
   SB={url,key};CLOUD=true;saveSbConfig();setSyncStatus('sync');
-  try{
-    const n=await cloudCount();
-    if(n>0){await cloudLoad();toast('Connected · loaded '+n.toLocaleString()+' cloud episodes');}
-    else{toast('Connected · uploading local data…');await cloudMigrate();toast('Uploaded '+state.episodes.length.toLocaleString()+' episodes to Supabase');}
-    setSyncStatus('synced');render();
-  }catch(e){CLOUD=false;SB=null;saveSbConfig();setSyncStatus('off');toast('Connect failed: '+e.message);}
+  if(session&&await ensureFreshSession()){
+    try{
+      const n=await cloudCount();
+      if(n===0){toast('Connected · uploading local data…');await cloudMigrate();toast('Uploaded '+state.episodes.length.toLocaleString()+' episodes');}
+      await enterApp();
+    }catch(e){setSyncStatus('error',e.message);toast('Connect failed: '+e.message);}
+  }else{
+    session=null;saveSession();toast('Connected — sign in to continue');showLogin();
+  }
 }
 function cloudDisconnect(){CLOUD=false;SB=null;saveSbConfig();setSyncStatus('off');toast('Disconnected — using local data');}
 
@@ -1217,14 +1284,41 @@ function wireListEditors(){
   settingsModal.querySelectorAll('[data-add]').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();settingsModal.querySelector(`[data-addbtn="${inp.dataset.add}"]`).click();}}));
 }
 
-(async function boot(){
-  loadSbConfig();
-  if(CLOUD){ try{ await cloudLoad(); setSyncStatus('synced'); }catch(e){ CLOUD=false; setSyncStatus('off'); toast('Cloud unavailable — using local data'); } }
-  if(!CLOUD){ seedAlphaOnce(); seedBatch2Once(); seedBatch3Once(); }
-  seedLlamaOnce();
-  seedTimeLogOnce();
+async function enterApp(){
+  document.getElementById('loginScreen').style.display='none';
+  try{ await cloudLoad(); setSyncStatus('synced'); }catch(e){ setSyncStatus('error',e.message); toast('Cloud load problem: '+e.message); }
+  seedLlamaOnce(); seedTimeLogOnce();
+  await fetchProfile();
+  applyRole();
   render();
   startWallClock();
+}
+function showLogin(){
+  const ls=document.getElementById('loginScreen');ls.style.display='';
+  const lg=document.getElementById('loginLogo');const bm=document.querySelector('.topbar .brand-mark img');if(lg&&bm)lg.src=bm.src;
+  const btn=document.getElementById('loginBtn'),em=document.getElementById('loginEmail'),pw=document.getElementById('loginPass'),err=document.getElementById('loginErr');
+  async function go(){
+    err.textContent='';const e=em.value.trim(),p=pw.value;
+    if(!e||!p){err.textContent='Enter email and password';return;}
+    btn.disabled=true;btn.textContent='Signing in…';
+    try{await authSignIn(e,p);await enterApp();}
+    catch(ex){err.textContent=ex.message;btn.disabled=false;btn.textContent='Sign in';}
+  }
+  btn.addEventListener('click',go);
+  [em,pw].forEach(i=>i.addEventListener('keydown',ev=>{if(ev.key==='Enter')go();}));
+  em.focus();
+}
+(async function boot(){
+  loadSbConfig();
+  const so=document.getElementById('btnSignOut');if(so)so.addEventListener('click',authSignOut);
+  if(!CLOUD){
+    // No Supabase configured: legacy local mode, no login required
+    seedAlphaOnce(); seedBatch2Once(); seedBatch3Once(); seedLlamaOnce(); seedTimeLogOnce();
+    me={role:'manager',name:'Local'};applyRole();
+    render(); startWallClock(); return;
+  }
+  if(session&&await ensureFreshSession()){ await enterApp(); }
+  else { session=null; saveSession(); showLogin(); }
 })();
 </script>
 </body>
