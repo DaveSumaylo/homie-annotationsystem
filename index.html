@@ -616,7 +616,7 @@ async function cloudLoad(){
   try{const rawT=await cloudLoadEntries();tWatermark=maxWm(rawT,null);
     const cloudT=rawT.map(r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day}));
     const cids=new Set(cloudT.map(t=>t.id));
-    const localOnly=(state.timeEntries||[]).filter(t=>!cids.has(t.id)&&!deletedTimeIds.has(t.id));
+    const localOnly=(state.timeEntries||[]).filter(t=>!cids.has(t.id)&&pendingTimeAdds.has(t.id)&&!deletedTimeIds.has(t.id));
     state.timeEntries=cloudT.concat(localOnly);
     syncedTimes=new Map(cloudT.map(t=>[t.id,timeSig(t)]));
   }catch(e){console.error('time entries load',e);}
@@ -648,7 +648,8 @@ async function cloudFlush(){
     if(tRemoved.length)for(let i=0;i<tRemoved.length;i+=50){const chunk=tRemoved.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('time_entries?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}
     for(const e of changed)syncedEps.set(e.id,epSig(e));
     for(const id of removed){syncedEps.delete(id);pendingEpDeletes.delete(id);}
-    for(const t of tChanged)syncedTimes.set(t.id,timeSig(t));
+    for(const t of tChanged){syncedTimes.set(t.id,timeSig(t));pendingTimeAdds.delete(t.id);}
+    if(tChanged.length)savePendAdds();
     for(const id of tRemoved)syncedTimes.delete(id);
     setSyncStatus('synced');
   }catch(err){setSyncStatus('error',err.message);console.error(err);}
@@ -672,7 +673,7 @@ async function fullTimeResync(){
   const cmap=new Map(raw.map(r=>[r.id,r]));
   const mapT=r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day});
   const pendEdits=new Map(state.timeEntries.filter(t=>cmap.has(t.id)&&timeSig(t)!==syncedTimes.get(t.id)).map(t=>[t.id,t]));
-  const keepAdds=state.timeEntries.filter(t=>!cmap.has(t.id)&&timeSig(t)!==syncedTimes.get(t.id)&&!deletedTimeIds.has(t.id));
+  const keepAdds=state.timeEntries.filter(t=>!cmap.has(t.id)&&pendingTimeAdds.has(t.id)&&!deletedTimeIds.has(t.id));
   state.timeEntries=raw.filter(r=>!deletedTimeIds.has(r.id)).map(r=>pendEdits.get(r.id)||mapT(r)).concat(keepAdds);
   syncedTimes=new Map(raw.map(r=>[r.id,timeSig(mapT(r))]));
 }
@@ -722,6 +723,7 @@ async function cloudPoll(){
         const idx=new Map(state.timeEntries.map(t=>[t.id,t]));
         for(const raw of rows){const inc=mapT(raw);
           if(deletedTimeIds.has(inc.id)){syncedTimes.set(inc.id,timeSig(inc));continue;}
+          if(pendingTimeAdds.delete(inc.id))savePendAdds();
           const cur=idx.get(inc.id);
           if(!cur){state.timeEntries.push(inc);idx.set(inc.id,inc);syncedTimes.set(inc.id,timeSig(inc));dirty=true;}
           else{const pending=timeSig(cur)!==syncedTimes.get(cur.id);
@@ -950,7 +952,7 @@ function clockInPerson(p){
   if(isOnClock(p)){toast(p+' is already clocked in');return;}
   const day=todayISO();
   const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:p,start:day+'T'+nowHM(),end:'',minutes:0,day};
-  state.timeEntries.push(e);save();persistLocal();pushEntry(e);
+  state.timeEntries.push(e);pendingTimeAdds.add(e.id);savePendAdds();save();persistLocal();pushEntry(e);
   toast(p+' clocked in · '+tlHM(e.start));
   renderTimeLog();
 }
@@ -977,15 +979,18 @@ async function cloudPushEntry(entry){await sbFetch('time_entries?on_conflict=id'
 async function cloudLoadEntries(){const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('time_entries?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudUpsertEntries(entries){for(let i=0;i<entries.length;i+=500){const chunk=entries.slice(i,i+500).map(e=>({id:e.id,person:e.person,start:e.start||null,end:e.end||null,minutes:e.minutes,day:e.day}));await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 let deletedTimeIds=new Set();try{deletedTimeIds=new Set(JSON.parse(localStorage.getItem('projectHomie.tdel')||'[]'));}catch(e){}
+let pendingTimeAdds=new Set();try{pendingTimeAdds=new Set(JSON.parse(localStorage.getItem('projectHomie.tpend')||'[]'));}catch(e){}
+function savePendAdds(){localStorage.setItem('projectHomie.tpend',JSON.stringify([...pendingTimeAdds]));}
 function saveDeleted(){localStorage.setItem('projectHomie.tdel',JSON.stringify([...deletedTimeIds]));}
 function hhmm(iso){return iso&&iso.indexOf('T')>=0?iso.split('T')[1].slice(0,5):'';}
 function minutesBetween(a,b){if(!a||!b||a.indexOf('T')<0||b.indexOf('T')<0)return null;const x=a.split('T')[1].split(':'),y=b.split('T')[1].split(':');let m=(+y[0]*60+ +y[1])-(+x[0]*60+ +x[1]);if(m<0)m+=1440;return m;}
-async function pushEntry(t){if(!CLOUD)return;try{await cloudUpsertEntries([t]);syncedTimes.set(t.id,timeSig(t));setSyncStatus('synced');}catch(e){setSyncStatus('error',e.message);toast('⚠ TIME ENTRY NOT SYNCED — retrying. '+e.message.slice(0,80));scheduleCloudSync();}}
+async function pushEntry(t){if(!CLOUD)return;try{await cloudUpsertEntries([t]);syncedTimes.set(t.id,timeSig(t));if(pendingTimeAdds.delete(t.id))savePendAdds();setSyncStatus('synced');}catch(e){setSyncStatus('error',e.message);toast('⚠ TIME ENTRY NOT SYNCED — retrying. '+e.message.slice(0,80));scheduleCloudSync();}}
 async function deleteTimeEntry(id){deletedTimeIds.add(id);saveDeleted();state.timeEntries=state.timeEntries.filter(x=>x.id!==id);save();persistLocal();
   if(CLOUD){try{await sbFetch('time_entries?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});syncedTimes.delete(id);}catch(e){toast('⚠ DELETE NOT SYNCED — retrying');scheduleCloudSync();}}}
-function addTimeEntry(){const day=todayISO();const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:'',start:'',end:'',minutes:0,day};state.timeEntries.push(e);save();persistLocal();pushEntry(e);renderTimeLog();}
+function addTimeEntry(){const day=todayISO();const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:'',start:'',end:'',minutes:0,day};state.timeEntries.push(e);pendingTimeAdds.add(e.id);savePendAdds();save();persistLocal();pushEntry(e);renderTimeLog();}
 // Self-healing: every load, re-add any embedded records missing locally (unless user deleted them)
 function seedTimeLogOnce(){
+  if(localStorage.getItem('projectHomie.import_timelog'))return;
   const have=new Set(state.timeEntries.map(t=>t.id));
   const add=TIMELOG_SEED.filter(a=>!have.has(a[0])&&!deletedTimeIds.has(a[0])).map(a=>({id:a[0],person:a[1],start:a[2],end:a[3],minutes:a[4],day:a[5]}));
   if(add.length){state.timeEntries.push(...add);save();if(CLOUD)cloudUpsertEntries(add).catch(e=>console.error(e));}
