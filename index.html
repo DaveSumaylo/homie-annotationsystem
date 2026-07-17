@@ -810,7 +810,7 @@ function wireCloud(){
 }
 
 /* ---------- mutations ---------- */
-function addEpisodes(bot,text){const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);const existing=new Set(episodesFor(bot).map(e=>e.name));const def=state.assignments[bot]||'';let added=0;
+function addEpisodes(bot,text){const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);const existing=new Set(episodesFor(bot).map(e=>e.name));const def='';/* Phase 1: pasted episodes land as Waiting so the engine assigns them */let added=0;
   for(const name of lines){if(existing.has(name))continue;existing.add(name);state.episodes.push({id:uid(),bot,name,taskCode:'',assignee:def,dateLabeled:'',done:false});added++;}save();return{added,skipped:lines.length-added};}
 
 /* ---------- CSV import (sheet format: title row, header, rows) ---------- */
