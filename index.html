@@ -974,7 +974,7 @@ function tickWallClock(){
 function startWallClock(){if(wallTimer)clearInterval(wallTimer);wallTimer=setInterval(tickWallClock,1000);}
 
 async function cloudPushEntry(entry){await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:entry.id,person:entry.person,start:entry.start||null,end:entry.end||null,minutes:entry.minutes,day:entry.day}])});}
-async function cloudLoadEntries(){const r=await sbFetch('time_entries?select=*&order=start&limit=20000',{headers:sbHeaders()});return await r.json();}
+async function cloudLoadEntries(){const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('time_entries?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudUpsertEntries(entries){for(let i=0;i<entries.length;i+=500){const chunk=entries.slice(i,i+500).map(e=>({id:e.id,person:e.person,start:e.start||null,end:e.end||null,minutes:e.minutes,day:e.day}));await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 let deletedTimeIds=new Set();try{deletedTimeIds=new Set(JSON.parse(localStorage.getItem('projectHomie.tdel')||'[]'));}catch(e){}
 function saveDeleted(){localStorage.setItem('projectHomie.tdel',JSON.stringify([...deletedTimeIds]));}
