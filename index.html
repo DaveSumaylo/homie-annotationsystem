@@ -749,7 +749,7 @@ async function cloudPoll(){
 /* ---------- Phase 1: Assignment Engine (client bridge; logic lives in Postgres RPC) ---------- */
 let engineOk=true;
 async function sbRpc(fn,args){const r=await sbFetch('rpc/'+fn,{method:'POST',headers:sbHeaders(),body:JSON.stringify(args||{})});return await r.json();}
-function myAnnotatorName(){if(!profile)return null;const n=((profile.display_name||profile.name||'')+'').trim();if(!n)return null;const hit=state.annotators.find(a=>a.toLowerCase()===n.toLowerCase());return hit||null;}
+function myAnnotatorName(){const n=((me&&me.name)||'').trim();if(!n)return null;const hit=state.annotators.find(a=>a.toLowerCase()===n.toLowerCase());return hit||null;}
 function mergeEngineRows(rows){if(!Array.isArray(rows)||!rows.length)return false;const idx=new Map(state.episodes.map(e=>[e.id,e]));let ch=false;
   for(const r of rows){const inc=rowToEp(r);const cur=idx.get(inc.id);
     if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);}else{Object.assign(cur,inc);}
