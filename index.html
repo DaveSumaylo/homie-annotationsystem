@@ -1010,7 +1010,7 @@ function clockOutPerson(p){
   const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;
   save();persistLocal();pushEntry(t);
   toast(p+' clocked out · '+fmtHM(t.minutes));
-  if(CLOUD&&session&&engineOk){sbRpc('release_to_backlog',{p_user:p}).then(n=>{if(n>0){toast(n+' unfinished → backlog');scheduleCloudSync();setTimeout(cloudPoll,600);}}).catch(e=>console.error('release',e));}
+  if(CLOUD&&session&&engineOk){sbRpc('release_to_backlog',{p_user:p}).then(n=>{const c=Array.isArray(n)?n[0]:n;if(c>0){toast(c+' unfinished → backlog');scheduleCloudSync();setTimeout(cloudPoll,600);}else{toast('No unfinished episodes to release');}}).catch(e=>{toast('⚠ Backlog release failed: '+String(e.message||e).slice(0,60));console.error('release',e);});}
   renderTimeLog();
 }
 function tickWallClock(){
@@ -1143,7 +1143,7 @@ function renderTimeLog(){
   const list=filtered.slice(0,TLLIM);
   const annOpts=t=>`<option value=\"\" ${!t.person?'selected':''}>—</option>`+state.annotators.map(a=>`<option ${a===t.person?'selected':''}>${esc(a)}</option>`).join('')+(state.annotators.includes(t.person)||!t.person?'':`<option selected>${esc(t.person)}</option>`);
   app.innerHTML=`
-   <div class="tl-clock">
+   ${isFreelancer()?'':`<div class="tl-clock">
      <div class="ck-group">
        <button class="btn btn-primary" id="btnCkIn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>Clock in</button>
        <select id="ckInWho" class="ck-sel" style="display:none"><option value="">Who's clocking in?</option>${state.annotators.filter(a=>!isOnClock(a)).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
@@ -1153,7 +1153,7 @@ function renderTimeLog(){
        <select id="ckOutWho" class="ck-sel" style="display:none"><option value="">Who's clocking out?</option>${[...new Set(openShifts().map(t=>t.person))].map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
      </div>
      <div class="wallclock"><div class="wc-time" id="wallTime"></div><div class="wc-date" id="wallDate"></div></div>
-   </div>
+   </div>`}
    <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${filtered.length>TLLIM?' · showing '+TLLIM:''}</span>
      ${isManager()?`<button class="btn btn-sm" id="tlAdd" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
      <select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
@@ -1175,12 +1175,14 @@ function renderTimeLog(){
       </div>`).join('')}
    </div>`;
   const bi=app.querySelector('#btnCkIn');const si=app.querySelector('#ckInWho');
+  if(bi&&si){
   bi.addEventListener('click',()=>{const show=si.style.display==='none';si.style.display=show?'':'none';app.querySelector('#ckOutWho').style.display='none';if(show)si.focus();});
   si.addEventListener('change',e=>{if(e.target.value)clockInPerson(e.target.value);});
   const bo=app.querySelector('#btnCkOut');const so=app.querySelector('#ckOutWho');
   if(bo&&!bo.disabled)bo.addEventListener('click',()=>{const show=so.style.display==='none';so.style.display=show?'':'none';si.style.display='none';if(show)so.focus();});
   so.addEventListener('change',e=>{if(e.target.value)clockOutPerson(e.target.value);});
   tickWallClock();
+  }
   app.querySelector('#tlFilterSel').addEventListener('change',e=>{tlFilter=e.target.value;renderTimeLog();});
   const tlAddBtn=app.querySelector('#tlAdd');if(tlAddBtn)tlAddBtn.addEventListener('click',addTimeEntry);
   const tbl=app.querySelector('#tlTable');
