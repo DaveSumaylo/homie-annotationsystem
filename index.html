@@ -437,7 +437,7 @@
       <button data-mode="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
       <button data-mode="manager" id="tabManager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
       <button data-mode="annotator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Annotator</button>
-      <button data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
+      <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
     <div class="userchip" id="userChip" style="display:none"><span class="uc-name" id="userName"></span><span class="uc-role" id="userRole"></span><button class="icon-btn" id="btnSignOut" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button></div>
     <span id="syncDot" class="syncdot off" title="Local only — not synced to cloud"></span>
@@ -604,9 +604,11 @@ function isWorker(){return me.role==='fulltime'||me.role==='freelancer'||me.role
 function applyRole(){
   const tm=document.getElementById('tabManager');if(tm)tm.style.display=isManager()?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
+  const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
   if(!isManager()&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(isFreelancer()&&mode==='timelog'){mode='annotator';sessionStorage.setItem('projectHomie.mode',mode);}
   document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));
 }
 setInterval(()=>{if(CLOUD&&session)ensureFreshSession();},60000);
@@ -1205,7 +1207,7 @@ function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
 function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
 function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
 function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
-function render(){ if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else renderAnnotator(); }
+function render(){ if(isFreelancer()&&mode==='timelog')mode='annotator'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
