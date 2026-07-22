@@ -394,6 +394,11 @@
   .fl-n{font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;color:var(--acc)}
   .qlab{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;color:var(--ink-soft)}
   .qlab input{width:110px}
+  .gscroll.ro-view{--sheet-cols:0px minmax(190px,1.6fr) 118px 140px 140px 60px 0px}
+  .ep-ro{font-size:12.5px;text-transform:none;padding:0 6px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .asg-ro{display:inline-block;font-size:11.5px;font-weight:700;text-transform:none;border:1px solid transparent;border-radius:20px;padding:3px 12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .asg-ro.blank{color:var(--ink-faint);background:var(--surface-3);border-color:var(--border)}
+  .tmonth .tclip{font-size:12.5px}
   .userchip .icon-btn{width:30px;height:30px}
   .tl-table{margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
   .tl-cols,.tl-row{display:grid;grid-template-columns:1.25fr 1.15fr .95fr .95fr .7fr 42px}
@@ -435,13 +440,13 @@
     </div>
     <div class="modeswitch" id="modeswitch">
       <button data-mode="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
-      <button data-mode="manager" id="tabManager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
+      <button data-mode="manager" id="tabManager" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
       <button data-mode="annotator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Annotator</button>
       <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
     <div class="userchip" id="userChip" style="display:none"><span class="uc-name" id="userName"></span><span class="uc-role" id="userRole"></span><button class="icon-btn" id="btnSignOut" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button></div>
     <span id="syncDot" class="syncdot off" title="Local only — not synced to cloud"></span>
-    <button class="icon-btn" id="btnSettings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+    <button class="icon-btn" id="btnSettings" title="Settings" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
   </div>
 </div>
 
@@ -1139,9 +1144,10 @@ function renderDashboard(){
 function tlHM(iso){if(!iso||iso.indexOf('T')<0)return '—';const p=iso.split('T')[1].split(':');let hh=+p[0];const ap=hh>=12?'pm':'am';hh=hh%12||12;return hh+':'+p[1]+' '+ap;}
 function renderTimeLog(){
   const TLLIM=150;
-  const all=state.timeEntries.slice();
+  const mineOnly=isManager()?'':(myAnnotatorName()||me.name||'');
+  const all=mineOnly?state.timeEntries.filter(t=>t.person===mineOnly):state.timeEntries.slice();
   const people=[...new Set(all.map(t=>t.person))].sort();
-  const filtered=(tlFilter?all.filter(t=>t.person===tlFilter):all).sort((a,b)=>((b.day+(b.start||''))<(a.day+(a.start||''))?-1:1));
+  const filtered=(tlFilter&&!mineOnly?all.filter(t=>t.person===tlFilter):all).sort((a,b)=>((b.day+(b.start||''))<(a.day+(a.start||''))?-1:1));
   const list=filtered.slice(0,TLLIM);
   const annOpts=t=>`<option value=\"\" ${!t.person?'selected':''}>—</option>`+state.annotators.map(a=>`<option ${a===t.person?'selected':''}>${esc(a)}</option>`).join('')+(state.annotators.includes(t.person)||!t.person?'':`<option selected>${esc(t.person)}</option>`);
   app.innerHTML=`
@@ -1158,7 +1164,7 @@ function renderTimeLog(){
    </div>`}
    <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${filtered.length>TLLIM?' · showing '+TLLIM:''}</span>
      ${isManager()?`<button class="btn btn-sm" id="tlAdd" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
-     <select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+     ${mineOnly?`<span class="hint" style="margin-left:auto">${esc(mineOnly)}</span>`:`<select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select>`}</div>
    <div class="tl-table" id="tlTable"><div class="tl-cols"><div>Date</div><div>Annotator</div><div>Time In</div><div>Time Out</div><div>Hours</div><div></div></div>
      ${list.map(t=>isManager()?`<div class="tl-row${t.start&&!t.end?' open':''}" data-id="${t.id}">
         <div><input type="date" class="tl-in" data-f="day" value="${t.day}"></div>
@@ -1185,7 +1191,7 @@ function renderTimeLog(){
   so.addEventListener('change',e=>{if(e.target.value)clockOutPerson(e.target.value);});
   tickWallClock();
   }
-  app.querySelector('#tlFilterSel').addEventListener('change',e=>{tlFilter=e.target.value;renderTimeLog();});
+  const tlf=app.querySelector('#tlFilterSel');if(tlf)tlf.addEventListener('change',e=>{tlFilter=e.target.value;renderTimeLog();});
   const tlAddBtn=app.querySelector('#tlAdd');if(tlAddBtn)tlAddBtn.addEventListener('click',addTimeEntry);
   const tbl=app.querySelector('#tlTable');
   if(!isManager()){tickWallClock();return;}
@@ -1310,13 +1316,11 @@ function keepTreeScroll(key){const tp=app.querySelector('.tree-panel');if(tp)tre
 function restoreTreeScroll(key){const tp=app.querySelector('.tree-panel');if(tp)tp.scrollTop=treeScroll[key];}
 
 function bulkBar(bot,day){
-  if(!selectedIds.size)return '';
+  if(!isManager()||!selectedIds.size)return '';
   return `<div class="bulkbar">
     <span class="bb-n">${selectedIds.size} selected</span>
-    <select id="bbTask"><option value="">Set task code…</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
-    <select id="bbAsg"><option value="">Set assignee…</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
-    <select id="bbBot"><option value="">Move to bot…</option>${state.bots.filter(b=>b!==bot).map(b=>`<option value="${esc(b)}">${botIcon(b)} ${esc(b)}</option>`).join('')}</select>
-    <span class="bb-date"><input type="date" id="bbDate" value="${day&&day!=='Undated'?day:''}"><button class="btn btn-sm" id="bbDateGo">Move to date</button></span>
+    <select id="bbTask"><option value="">TASK CODE</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
+    <select id="bbAsg"><option value="">ASSIGNEE</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
     ${isManager()?'<button class="btn btn-sm" id="bbBacklog">⇢ Send to backlog</button>':''}
     <button class="btn btn-sm" id="bbClear">✕ Clear</button>
   </div>`;
@@ -1332,24 +1336,31 @@ function dayDetail(bot,day){
   const allSel=eps.length>0&&eps.every(e=>selectedIds.has(e.id));
   return `<div class="detail-head"><span class="dh-emoji">${botIcon(bot)}</span>
       <div><div class="dh-title">${esc(bot)}</div><div class="dh-sub">${prettyDate(day)}</div></div>
-      <button class="btn btn-sm" id="addToggle" style="margin-left:14px">${addOpen?'✕ Close':'+ Add episodes'}</button>
+      ${isManager()?`<button class="btn btn-sm" id="addToggle" style="margin-left:14px">${addOpen?'✕ Close':'+ Add episodes'}</button>`:''}
       <div class="dh-prog"><div class="prog" style="width:150px"><i style="width:${s.pct}%"></i></div><span class="dh-frac">${s.done}/${s.total}</span></div></div>
     ${addBox(bot)}
     ${bulkBar(bot,day)}
-    ${eps.length===0?`<div class="empty-state"><h3>No episodes for this day</h3><p>Use + Add episodes to paste late uploads.</p></div>`:`
-    <div class="gscroll"><div class="ginner">
-      <div class="gcols"><div><input type="checkbox" class="g-check" id="selAll" ${allSel?'checked':''} title="Select all"></div><div>Episode name</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>Done</div><div></div></div>
+    ${eps.length===0?`<div class="empty-state"><h3>No episodes for this day</h3><p>${isManager()?'Use + Add episodes to paste late uploads.':'Nothing assigned here yet.'}</p></div>`:`
+    <div class="gscroll ${isManager()?'':'ro-view'}"><div class="ginner">
+      <div class="gcols"><div>${isManager()?`<input type="checkbox" class="g-check" id="selAll" ${allSel?'checked':''} title="Select all">`:''}</div><div>Episode name</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>Done</div><div></div></div>
       ${eps.map(gridRow).join('')}
     </div></div>`}`;
 }
-function gridRow(e){return `<div class="grow ${e.done?'done':''} ${selectedIds.has(e.id)?'sel':''}" data-eid="${e.id}">
-    <div><input type="checkbox" class="g-check" data-sel="${e.id}" ${selectedIds.has(e.id)?'checked':''}></div>
-    <div><input type="text" class="g-name" data-name="${e.id}" value="${esc(e.name)}"></div>
+function asgReadOnly(name){
+  if(!name)return '<span class="asg-ro blank">—</span>';
+  const c=annoColor(name);
+  return `<span class="asg-ro" style="background:${c.bg};color:${c.fg};border-color:${c.bd}">${esc(name)}</span>`;
+}
+function gridRow(e){
+  const mgr=isManager();
+  return `<div class="grow ${e.done?'done':''} ${mgr&&selectedIds.has(e.id)?'sel':''}" data-eid="${e.id}">
+    <div>${mgr?`<input type="checkbox" class="g-check" data-sel="${e.id}" ${selectedIds.has(e.id)?'checked':''}>`:''}</div>
+    <div>${mgr?`<input type="text" class="g-name" data-name="${e.id}" value="${esc(e.name)}">`:`<span class="ep-ro">${esc(e.name)}</span>`}</div>
     <div><select class="g-task" data-task="${e.id}"><option value="">—</option>${state.taskCodes.map(t=>`<option value="${esc(t)}" ${t===e.taskCode?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
-    <div>${gridAsg(e.id,e.assignee)}</div>
+    <div>${mgr?gridAsg(e.id,e.assignee):asgReadOnly(e.assignee)}</div>
     <div><input type="date" class="g-date" data-date="${e.id}" value="${e.dateLabeled||''}"></div>
     <div><input type="checkbox" class="g-check" data-done="${e.id}" ${e.done?'checked':''}></div>
-    <div><button class="trash" data-del="${e.id}" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></div>
+    <div>${mgr?`<button class="trash" data-del="${e.id}" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>`:''}</div>
   </div>`;}
 function recolorAsg(el){const v=el.value;const c=v?annoColor(v):null;if(c){el.style.background=c.bg;el.style.color=c.fg;el.style.borderColor=c.bd;el.classList.remove('blank');}else{el.style.background='';el.style.color='';el.style.borderColor='';el.classList.add('blank');}}
 
@@ -1411,7 +1422,8 @@ function treeBot(bot){
       <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
       <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span><span class="tcount">${total}</span></div>
     ${bo?months.map(m=>{const mo=monthOpen(bot,m);const days=daysInMonth(bot,m);
-      return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span><span class="tcount">${days.length}d</span></div>
+      let md=0,mt=0;days.forEach(d=>{const st=statsOf(dayEpisodes(bot,d));md+=st.done;mt+=st.total;});const minc=md<mt;
+      return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span><span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
         ${mo?days.map(d=>{const active=sel.bot===bot&&sel.day===d;const st=statsOf(dayEpisodes(bot,d));
           return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span><span class="tclip ${st.done<st.total?'warn':''}">${st.done<st.total?'⚠️ ':''}${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
 }
@@ -1492,10 +1504,12 @@ function wireListEditors(){
   settingsModal.querySelectorAll('[data-add]').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();settingsModal.querySelector(`[data-addbtn="${inp.dataset.add}"]`).click();}}));
 }
 
-function hideBoot(){const b=document.getElementById('bootScreen');if(b)b.remove();}
-setTimeout(hideBoot,20000); /* failsafe */
+function hideBoot(){const b=document.getElementById('bootScreen');if(b)b.style.display='none';}
+function showBoot(){const b=document.getElementById('bootScreen');if(b)b.style.display='';}
+setTimeout(hideBoot,25000); /* failsafe */
 async function enterApp(){
   document.getElementById('loginScreen').style.display='none';
+  showBoot();
   try{ await cloudLoad(); setSyncStatus('synced'); }catch(e){ setSyncStatus('error',e.message); toast('Cloud load problem: '+e.message); }
   seedLlamaOnce(); seedTimeLogOnce();
   await fetchProfile();
