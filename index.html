@@ -241,6 +241,20 @@
   body{text-transform:uppercase}
   input,textarea,select,option,.ep-name,.s-name,.g-name,.anno-pill,.asg,.g-asg,.ep-assignee,.kpi-name,.clk-name,.tl-person,.tl-clk-name{text-transform:none}
   .cprog.warn>i{background:linear-gradient(90deg,#b45309,var(--amber))}
+  .row1 .bc-total{margin-left:auto;font-size:12px;font-weight:800;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+  .bc-dates{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+  .bc-date{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:7px 9px}
+  .bc-dhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+  .bc-dlabel{font-size:10.5px;font-weight:800;letter-spacing:.2px;color:var(--ink)}
+  .bc-dcount{font-size:11px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
+  .bc-p{display:flex;align-items:center;justify-content:space-between;padding:2px 0;font-size:11.5px}
+  .bc-nm{display:flex;align-items:center;gap:6px;color:var(--ink)}
+  .bc-tag{font-size:8.5px;font-weight:800;letter-spacing:.3px;padding:1px 5px;border-radius:5px;line-height:1.5}
+  .bc-tag.da{background:rgba(16,168,116,.18);color:var(--acc);border:1px solid rgba(16,168,116,.35)}
+  .bc-tag.fl{background:rgba(180,83,9,.18);color:var(--amber);border:1px solid rgba(180,83,9,.4)}
+  .bc-pn{font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .bc-none{color:var(--ink-faint);font-style:italic;font-size:10.5px}
+  .bc-alldone{color:var(--acc);font-size:11px;font-weight:700;text-align:center;padding:10px 0}
   select.asg,select.g-asg{text-align:center;text-align-last:center}
   .tclip.warn{color:#f4b45e!important;background:rgba(245,158,11,.18)!important}
   .month-bar{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:800;color:var(--ink);background:var(--surface-3);border:1px solid var(--border-strong);border-radius:9px;padding:8px 11px;margin:10px 0 6px;cursor:pointer;user-select:none}
@@ -793,6 +807,7 @@ function engineFail(e){const m=String((e&&e.message)||'');
 async function engineFillQueue(){
   if(!CLOUD||!session||!engineOk||isManager())return;
   const who=myAnnotatorName();if(!who)return;
+  if(!isFreelancer()&&!isOnClock(who))return;   /* full-timer must clock in before any assignment */
   const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||10);
   try{const rows=await sbRpc('fill_queue',{p_user:who,p_queue:cap});
     if(mergeEngineRows(rows)){toast('MY QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
@@ -801,6 +816,7 @@ async function engineOnComplete(epId){
   if(!CLOUD||!session||!engineOk)return;
   const e=state.episodes.find(x=>x.id===epId);
   if(!e||!e.assignee||!state.annotators.includes(e.assignee))return;
+  if(!isManager()&&!isFreelancer()&&!isOnClock(myAnnotatorName()))return;   /* full-timer must be clocked in to get a refill */
   const batch=isFreelancer()?(state.freelancerQueueSize||6):(state.batchSize||5);
   try{const rows=await sbRpc('complete_episode',{p_id:epId,p_batch:batch});
     if(Array.isArray(rows)&&rows.length){mergeEngineRows(rows);toast('QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
@@ -1348,16 +1364,26 @@ function renderManager(){
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
   app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>{mgrBot=c.dataset.bot;mgrDay=null;selectedIds.clear();addOpen=false;render();}));
 }
+function assigneeTag(name){return FULLTIME.includes(name)?'D.A':'FL';}
 function botCard(bot){
-  const s=botStats(bot);const pending=s.total-s.done;
+  const eps=episodesFor(bot);
+  // dates that still have unfinished episodes, newest first
+  const byDate={};
+  eps.forEach(e=>{const d=dayOf(e);(byDate[d]||(byDate[d]=[])).push(e);});
+  const openDates=Object.keys(byDate).filter(d=>byDate[d].some(e=>!e.done)).sort((a,b)=>a<b?1:-1);
+  const rowsHtml=openDates.map(d=>{
+    const list=byDate[d];const done=list.filter(e=>e.done).length;
+    // per-assignee pending count (unfinished + has an assignee)
+    const pend={};
+    list.forEach(e=>{if(!e.done&&e.assignee&&e.assignee.trim()){pend[e.assignee]=(pend[e.assignee]||0)+1;}});
+    const people=Object.keys(pend).sort((a,b)=>pend[b]-pend[a]||(a<b?-1:1));
+    const peopleHtml=people.length?people.map(p=>`<div class="bc-p"><span class="bc-nm"><b class="bc-tag ${assigneeTag(p)==='D.A'?'da':'fl'}">${assigneeTag(p)}</b> ${esc(p)}</span><span class="bc-pn">${pend[p]}</span></div>`).join('')
+      :`<div class="bc-p bc-none">Unassigned backlog</div>`;
+    return `<div class="bc-date"><div class="bc-dhead"><span class="bc-dlabel">${prettyDate(d)}</span><span class="bc-dcount">${done}/${list.length}</span></div>${peopleHtml}</div>`;
+  }).join('');
   return `<div class="bot-card" data-bot="${esc(bot)}">
-    <div class="row1"><span class="bot-emoji">${botIcon(bot)}</span><h3>${esc(bot)}</h3></div>
-    <div class="bot-stats">
-      <div class="bs"><span class="bs-label">Total</span><span class="bs-num">${s.total}</span></div>
-      <div class="bs"><span class="bs-label">Done</span><span class="bs-num done">${s.done}</span></div>
-      <div class="bs"><span class="bs-label">Pending</span><span class="bs-num pend">${pending}</span></div>
-    </div>
-    <div class="cprog ${s.pct<100?'warn':''}"><i style="width:${s.pct}%"></i><span class="prog-pct">${s.pct}%</span></div>
+    <div class="row1"><span class="bot-emoji">${botIcon(bot)}</span><h3>${esc(bot)}</h3><span class="bc-total">${eps.length}</span></div>
+    <div class="bc-dates">${openDates.length?rowsHtml:'<div class="bc-alldone">All caught up ✓</div>'}</div>
   </div>`;
 }
 
