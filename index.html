@@ -1146,25 +1146,63 @@ function renderDashboard(){
 }
 
 function tlHM(iso){if(!iso||iso.indexOf('T')<0)return '—';const p=iso.split('T')[1].split(':');let hh=+p[0];const ap=hh>=12?'pm':'am';hh=hh%12||12;return hh+':'+p[1]+' '+ap;}
+const MON3={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function csvDate(s){
+  s=(s||'').trim();if(!s)return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;                                  /* 2026-07-25 */
+  let m=s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})$/);                     /* 25 Jul 2026 */
+  if(m){const mo=MON3[m[2].slice(0,3).toLowerCase()];if(mo)return m[3]+'-'+String(mo).padStart(2,'0')+'-'+m[1].padStart(2,'0');}
+  m=s.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})$/);                       /* Jul 25 2026 / Jul 25, 2026 */
+  if(m){const mo=MON3[m[1].slice(0,3).toLowerCase()];if(mo)return m[3]+'-'+String(mo).padStart(2,'0')+'-'+m[2].padStart(2,'0');}
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);                               /* 07/25/2026 (US m/d/y) */
+  if(m)return m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');
+  return '';
+}
+function csvTimeMin(s){
+  s=(s||'').trim();if(!s)return null;
+  const m=s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);                       /* 10:27 am | 6:27 pm | 14:00 */
+  if(!m)return null;
+  let hh=+m[1];const mm=+m[2];const ap=(m[3]||'').toLowerCase();
+  if(ap==='am'){if(hh===12)hh=0;}
+  else if(ap==='pm'){if(hh!==12)hh+=12;}
+  return hh*60+mm;
+}
 function importTimeCSV(text){
   let added=0,skipped=0,maxDay='';const people=new Set();
   const have=new Set(state.timeEntries.map(t=>t.person+'|'+t.day+'|'+(t.start||'')));
-  const toMin=s=>{const m=(s||'').trim().match(/^(\d{1,2}):(\d{2})/);return m?(+m[1])*60+(+m[2]):null;};
   const mk=(d,mins)=>mins==null?'':d+'T'+String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
-  for(const raw of text.split(/\r?\n/)){
-    if(!raw.trim())continue;
-    const c=splitCSVLine(raw);
+  const lines=text.split(/\r?\n/).filter(l=>l.trim().length);
+  if(!lines.length)return{added:0,skipped:0,people:[],maxDay:''};
+  /* --- detect columns from the header row (order-independent) --- */
+  let idx={date:-1,person:-1,in:-1,out:-1,hours:-1};
+  const head=splitCSVLine(lines[0]).map(x=>(x||'').trim().toLowerCase());
+  const looksHeader=head.some(x=>/date|annotator|name|person|time|hour/.test(x));
+  if(looksHeader){
+    head.forEach((x,i)=>{
+      if(idx.date<0&&/date/.test(x))idx.date=i;
+      else if(idx.person<0&&/(annotator|person|name)/.test(x))idx.person=i;
+      else if(idx.in<0&&/(time\s*in|clock\s*in|^in$)/.test(x))idx.in=i;
+      else if(idx.out<0&&/(time\s*out|clock\s*out|^out$)/.test(x))idx.out=i;
+      else if(idx.hours<0&&/hour/.test(x))idx.hours=i;
+    });
+  }
+  /* fallback to the standard order: Date, Annotator, In, Out, Hours */
+  if(idx.date<0)idx.date=0;
+  if(idx.person<0)idx.person=1;
+  if(idx.in<0)idx.in=2;
+  if(idx.out<0)idx.out=3;
+  if(idx.hours<0)idx.hours=4;
+  for(let li=looksHeader?1:0; li<lines.length; li++){
+    const c=splitCSVLine(lines[li]);
     if(c.length<2)continue;
-    const person=(c[0]||'').trim();
-    if(/^(name|person|annotator)$/i.test(person)){skipped++;continue;}
-    const day=normDate((c[1]||'').trim());
+    const person=(c[idx.person]||'').trim();
+    const day=csvDate(c[idx.date]||'');
     if(!person||!day){skipped++;continue;}
-    const sRaw=(c[2]||'').trim(),eRaw=(c[3]||'').trim();
-    const sm=toMin(sRaw),em=toMin(eRaw);
+    const sm=csvTimeMin(c[idx.in]||''),em=csvTimeMin(c[idx.out]||'');
     const start=mk(day,sm);
     const key=person+'|'+day+'|'+start;
     if(have.has(key)){skipped++;continue;}
-    let minutes=parseFloat((c[4]||'').trim());
+    let minutes=parseFloat((c[idx.hours]||'').trim());
     if(isNaN(minutes)){minutes=(sm!=null&&em!=null)?(em>=sm?em-sm:(1440-sm+em)):0;}
     else{minutes=Math.round(minutes*60);}
     const ent={id:uid(),person,day,start,end:mk(day,em),minutes:Math.max(0,minutes)};
@@ -1276,20 +1314,8 @@ function renderManager(){
       <div class="stat s-bots"><div class="k">Active bots</div><div class="v" style="color:var(--blue)">${o.activeBots}</div><div class="sub">have episodes loaded</div></div>
     </div>
     <div class="section-head"><h2>Bots</h2></div>
-    <div class="bot-grid">${state.bots.map(botCard).join('')}</div>
-    <div class="section-head" style="margin-top:26px"><h2>Freelancer output</h2></div>
-    <div id="flPanel" class="fl-panel"><div class="hint">Loading freelancer output…</div></div>`;
+    <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
   app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>{mgrBot=c.dataset.bot;mgrDay=null;selectedIds.clear();addOpen=false;render();}));
-  loadManagerEngineStats();
-}
-async function loadManagerEngineStats(){
-  if(!CLOUD||!session||!engineOk)return;
-  try{const rows=await sbRpc('freelancer_counts',{p_from:'',p_to:''});
-    const el=document.getElementById('flPanel');if(!el)return;
-    if(!Array.isArray(rows)||!rows.length){el.innerHTML='<div class="hint">No freelancer episodes completed yet.</div>';return;}
-    const max=Math.max(...rows.map(r=>r.done_count||0),1);
-    el.innerHTML='<div class="fl-grid">'+rows.map(r=>`<div class="fl-row"><span class="fl-name">${esc(r.person)}</span><div class="fl-bar"><i style="width:${Math.round((r.done_count/max)*100)}%"></i></div><span class="fl-n">${r.done_count}</span></div>`).join('')+'</div>';
-  }catch(e){const el=document.getElementById('flPanel');if(el)el.innerHTML='<div class="hint">Freelancer counts unavailable (run Phase 2 SQL).</div>';}
 }
 function botCard(bot){
   const s=botStats(bot);const pending=s.total-s.done;
