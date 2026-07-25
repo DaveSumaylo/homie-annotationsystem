@@ -512,6 +512,7 @@ const SEED3={Godzilla:GODZILLA_SEED,Hugo:HUGO_SEED,Igor:IGOR_SEED,Jackie:JACKIE_
 let state=load();
 if(!Array.isArray(state.timeEntries))state.timeEntries=[];
 if(typeof state.batchSize!=='number')state.batchSize=5;
+if(typeof state.listsVersion!=='number')state.listsVersion=0;
 if(typeof state.queueSize!=='number')state.queueSize=10;
 let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog'].includes(m)?m:'dashboard';})();
 let openBot=null;
@@ -627,7 +628,7 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
 function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,createdAt:Date.now()};}
 function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0);}
-function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5});}
+function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
 async function cloudCount(){const r=await sbFetch('episodes?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
@@ -638,7 +639,9 @@ async function cloudLoad(){
   epWatermark=maxWm(rows,null);
   state.episodes=rows.map(rowToEp);
   const meta=await cloudLoadMeta();
-  if(meta){if(Array.isArray(meta.bots)&&meta.bots.length)state.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)state.taskCodes=meta.taskCodes;if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;if(typeof meta.queueSize==='number')state.queueSize=meta.queueSize;if(typeof meta.freelancerQueueSize==='number')state.freelancerQueueSize=meta.freelancerQueueSize;if(typeof meta.batchSize==='number')state.batchSize=meta.batchSize;}
+  if(meta){const cv=meta.listsVersion||0,lv=state.listsVersion||0;
+    if(cv>=lv){if(Array.isArray(meta.bots))state.bots=meta.bots;if(Array.isArray(meta.annotators))state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes))state.taskCodes=meta.taskCodes;state.listsVersion=cv;}
+    if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;if(typeof meta.queueSize==='number')state.queueSize=meta.queueSize;if(typeof meta.freelancerQueueSize==='number')state.freelancerQueueSize=meta.freelancerQueueSize;if(typeof meta.batchSize==='number')state.batchSize=meta.batchSize;}
   try{const rawT=await cloudLoadEntries();tWatermark=maxWm(rawT,null);
     const cloudT=rawT.map(r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day}));
     const cids=new Set(cloudT.map(t=>t.id));
@@ -652,7 +655,7 @@ async function cloudLoad(){
 }
 async function cloudChunkUpsert(rows){for(let i=0;i<rows.length;i+=500){const chunk=rows.slice(i,i+500);await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 async function cloudChunkDelete(ids){for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('episodes?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}}
-async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5}}])});}
+async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0}}])});}
 
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
@@ -712,9 +715,7 @@ async function cloudPoll(){
     try{const meta=await cloudLoadMeta();
       if(meta&&metaSig()===syncedMeta){
         const tmp={bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides};
-        if(Array.isArray(meta.bots)&&meta.bots.length)tmp.bots=meta.bots;
-        if(Array.isArray(meta.annotators)&&meta.annotators.length)tmp.annotators=meta.annotators;
-        if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)tmp.taskCodes=meta.taskCodes;
+        if((meta.listsVersion||0)>=(state.listsVersion||0)){if(Array.isArray(meta.bots)&&meta.bots.length)tmp.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)tmp.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)tmp.taskCodes=meta.taskCodes;tmp.listsVersion=meta.listsVersion||0;}
         if(meta.assignments)tmp.assignments=meta.assignments;
         if(meta.dayOverrides)tmp.dayOverrides=meta.dayOverrides;
         tmp.queueSize=(typeof meta.queueSize==='number')?meta.queueSize:(state.queueSize||5);
@@ -1503,8 +1504,8 @@ function listEditor(key,title,desc){return `<div class="settings-block" data-lis
     <div class="chip-row">${state[key].map((v,i)=>`<span class="chip">${key==='bots'?botIcon(v)+' ':''}${esc(v)}<button data-rm="${key}" data-val="${esc(v)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="11" height="11"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join('')}</div>
     <div class="add-inline"><input type="text" data-add="${key}" placeholder="Add ${title.toLowerCase().replace(/s$/,'')}…"><button class="btn btn-sm" data-addbtn="${key}">Add</button></div></div>`;}
 function wireListEditors(){
-  settingsModal.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.rm;const val=b.dataset.val;state[k]=state[k].filter(x=>x!==val);save();openSettings();render();}));
-  settingsModal.querySelectorAll('[data-addbtn]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.addbtn;const inp=settingsModal.querySelector(`[data-add="${k}"]`);const v=inp.value.trim();if(!v)return;if(!state[k].includes(v))state[k].push(v);save();openSettings();render();}));
+  settingsModal.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.rm;const val=b.dataset.val;state[k]=state[k].filter(x=>x!==val);state.listsVersion=Date.now();save();openSettings();render();}));
+  settingsModal.querySelectorAll('[data-addbtn]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.addbtn;const inp=settingsModal.querySelector(`[data-add="${k}"]`);const v=inp.value.trim();if(!v)return;if(!state[k].includes(v))state[k].push(v);state.listsVersion=Date.now();save();openSettings();render();}));
   settingsModal.querySelectorAll('[data-add]').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();settingsModal.querySelector(`[data-addbtn="${inp.dataset.add}"]`).click();}}));
 }
 
