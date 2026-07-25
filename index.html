@@ -1500,10 +1500,10 @@ function openSettings(){
 }
 function closeSettings(){settingsModal.innerHTML='';}
 function listEditor(key,title,desc){return `<div class="settings-block" data-list="${key}"><h4>${title}</h4><p>${desc}</p>
-    <div class="chip-row">${state[key].map((v,i)=>`<span class="chip">${key==='bots'?botIcon(v)+' ':''}${esc(v)}<button data-rm="${key}:${i}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="11" height="11"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join('')}</div>
+    <div class="chip-row">${state[key].map((v,i)=>`<span class="chip">${key==='bots'?botIcon(v)+' ':''}${esc(v)}<button data-rm="${key}" data-val="${esc(v)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="11" height="11"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join('')}</div>
     <div class="add-inline"><input type="text" data-add="${key}" placeholder="Add ${title.toLowerCase().replace(/s$/,'')}…"><button class="btn btn-sm" data-addbtn="${key}">Add</button></div></div>`;}
 function wireListEditors(){
-  settingsModal.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{const [k,i]=b.dataset.rm.split(':');state[k].splice(+i,1);save();openSettings();render();}));
+  settingsModal.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.rm;const val=b.dataset.val;state[k]=state[k].filter(x=>x!==val);save();openSettings();render();}));
   settingsModal.querySelectorAll('[data-addbtn]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.addbtn;const inp=settingsModal.querySelector(`[data-add="${k}"]`);const v=inp.value.trim();if(!v)return;if(!state[k].includes(v))state[k].push(v);save();openSettings();render();}));
   settingsModal.querySelectorAll('[data-add]').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();settingsModal.querySelector(`[data-addbtn="${inp.dataset.add}"]`).click();}}));
 }
