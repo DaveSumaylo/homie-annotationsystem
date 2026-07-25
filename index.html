@@ -474,7 +474,7 @@ const SEED={
   bots:['Alpha','Bravo','Charlie','Delta','Echo','Fox','Godzilla','Hugo','Igor','Jackie','Kilo','Llama'],
   annotators:['Mark','RJ','Axl','Cris','Alwin','Sharbell','Ata','Sean','Kent','Jerome','Mark Aaron','Darius'],
   taskCodes:['TM19','TM53','TM51','TM52','TM02','TM30','TM03','TM05','TM27','ST01','ST02','ST03'],
-  queueSize:5, freelancerQueueSize:6, assignments:{}, dayOverrides:{}, episodes:[]
+  queueSize:10, freelancerQueueSize:6, batchSize:5, assignments:{}, dayOverrides:{}, episodes:[]
 };
 const BOT_ICONS={Alpha:'🤖',Bravo:'🦾',Charlie:'🐎',Delta:'🔺',Echo:'📡',Fox:'🦊',Godzilla:'🦖',Hugo:'🎩',Igor:'🧪',Jackie:'🐆',Kilo:'🥋',Llama:'🦙'};
 const ICON_POOL=['🛰️','🚀','⚙️','🧩','🎯','⭐','🔋','📦','🧲','🛸','🕹️','🔩'];
@@ -511,6 +511,8 @@ const SEED3={Godzilla:GODZILLA_SEED,Hugo:HUGO_SEED,Igor:IGOR_SEED,Jackie:JACKIE_
 
 let state=load();
 if(!Array.isArray(state.timeEntries))state.timeEntries=[];
+if(typeof state.batchSize!=='number')state.batchSize=5;
+if(typeof state.queueSize!=='number')state.queueSize=10;
 let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog'].includes(m)?m:'dashboard';})();
 let openBot=null;
 const drawerOpen=new Set();       // manager drawer date groups that are EXPANDED (default collapsed)
@@ -625,7 +627,7 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
 function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,createdAt:Date.now()};}
 function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0);}
-function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||5,freelancerQueueSize:state.freelancerQueueSize||6});}
+function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
 async function cloudCount(){const r=await sbFetch('episodes?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
@@ -636,7 +638,7 @@ async function cloudLoad(){
   epWatermark=maxWm(rows,null);
   state.episodes=rows.map(rowToEp);
   const meta=await cloudLoadMeta();
-  if(meta){if(Array.isArray(meta.bots)&&meta.bots.length)state.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)state.taskCodes=meta.taskCodes;if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;if(typeof meta.queueSize==='number')state.queueSize=meta.queueSize;if(typeof meta.freelancerQueueSize==='number')state.freelancerQueueSize=meta.freelancerQueueSize;}
+  if(meta){if(Array.isArray(meta.bots)&&meta.bots.length)state.bots=meta.bots;if(Array.isArray(meta.annotators)&&meta.annotators.length)state.annotators=meta.annotators;if(Array.isArray(meta.taskCodes)&&meta.taskCodes.length)state.taskCodes=meta.taskCodes;if(meta.assignments)state.assignments=meta.assignments;if(meta.dayOverrides)state.dayOverrides=meta.dayOverrides;if(typeof meta.queueSize==='number')state.queueSize=meta.queueSize;if(typeof meta.freelancerQueueSize==='number')state.freelancerQueueSize=meta.freelancerQueueSize;if(typeof meta.batchSize==='number')state.batchSize=meta.batchSize;}
   try{const rawT=await cloudLoadEntries();tWatermark=maxWm(rawT,null);
     const cloudT=rawT.map(r=>({id:r.id,person:r.person,start:r.start||'',end:r.end||'',minutes:r.minutes||0,day:r.day}));
     const cids=new Set(cloudT.map(t=>t.id));
@@ -650,7 +652,7 @@ async function cloudLoad(){
 }
 async function cloudChunkUpsert(rows){for(let i=0;i<rows.length;i+=500){const chunk=rows.slice(i,i+500);await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 async function cloudChunkDelete(ids){for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('episodes?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}}
-async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||5,freelancerQueueSize:state.freelancerQueueSize||6}}])});}
+async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5}}])});}
 
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
@@ -717,6 +719,7 @@ async function cloudPoll(){
         if(meta.dayOverrides)tmp.dayOverrides=meta.dayOverrides;
         tmp.queueSize=(typeof meta.queueSize==='number')?meta.queueSize:(state.queueSize||5);
         tmp.freelancerQueueSize=(typeof meta.freelancerQueueSize==='number')?meta.freelancerQueueSize:(state.freelancerQueueSize||6);
+        tmp.batchSize=(typeof meta.batchSize==='number')?meta.batchSize:(state.batchSize||5);
         if(JSON.stringify(tmp)!==syncedMeta){Object.assign(state,tmp);syncedMeta=metaSig();dirty=true;}
       }
     }catch(e){console.error('poll meta',e);}
@@ -780,7 +783,7 @@ function engineFail(e){const m=String((e&&e.message)||'');
 async function engineFillQueue(){
   if(!CLOUD||!session||!engineOk||isManager())return;
   const who=myAnnotatorName();if(!who)return;
-  const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||5);
+  const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||10);
   try{const rows=await sbRpc('fill_queue',{p_user:who,p_queue:cap});
     if(mergeEngineRows(rows)){toast('MY QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
   }catch(e){engineFail(e);}}
@@ -788,9 +791,9 @@ async function engineOnComplete(epId){
   if(!CLOUD||!session||!engineOk)return;
   const e=state.episodes.find(x=>x.id===epId);
   if(!e||!e.assignee||!state.annotators.includes(e.assignee))return;
-  const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||5);
-  try{const rows=await sbRpc('complete_episode',{p_id:epId,p_queue:cap});
-    if(mergeEngineRows(rows)&&!isTypingNow())render();
+  const batch=isFreelancer()?(state.freelancerQueueSize||6):(state.batchSize||5);
+  try{const rows=await sbRpc('complete_episode',{p_id:epId,p_batch:batch});
+    if(Array.isArray(rows)&&rows.length){mergeEngineRows(rows);toast('QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
   }catch(err){engineFail(err);}}
 async function cloudMigrate(){if(!CLOUD)return;syncedEps=new Map();syncedMeta='';await cloudFlush();}
 async function cloudConnect(url,key){
@@ -1096,7 +1099,7 @@ function renderDashboard(){
   const n=S.M.data.length;const trend=n>=2?(S.M.data[n-1]<S.M.data[n-2]?'↓ Declining':'↑ Improving'):'';
   const ps=(l,v)=>`<div class="ps"><div class="psl">${l}</div><div class="psv">${v}</div></div>`;
   app.innerHTML=`
-   <div class="dash-top"><h2>DASHBOARD</h2><span class="hint">Team = full-time annotators</span><input type="date" id="dashDate" value="${day}"></div>
+   <div class="dash-top"><h2>DASHBOARD</h2><input type="date" id="dashDate" value="${day}"></div>
    <div class="stats">
      <div class="stat" style="--sc:var(--acc)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span><div class="k">Completed</div><div class="v">${o.done.toLocaleString()}</div><div class="sub">episodes done</div></div>
      <div class="stat" style="--sc:var(--amber)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></span><div class="k">Remaining</div><div class="v">${o.pending.toLocaleString()}</div><div class="sub">pending</div></div>
@@ -1409,7 +1412,7 @@ function renderAnnotator(){
   wireDetail(sel.bot,()=>sel.day,renderAnnotator);
 }
 function myQueueBar(){
-  const who=myAnnotatorName();const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||5);
+  const who=myAnnotatorName();const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||10);
   const q=state.episodes.filter(e=>e.assignee===who&&!e.done).sort((a,b)=>a.name<b.name?-1:1);
   return `<div class="myq"><span class="myq-t">My Queue${isFreelancer()?' · Backlog':''}</span><span class="myq-n">${q.length}/${cap}</span>
     ${q.length?q.slice(0,12).map(e=>`<button class="myq-chip" data-q="${e.id}" title="${esc(e.bot)} · ${esc(e.name)}">${esc(e.name.replace('episode_',''))}</button>`).join('')
@@ -1484,7 +1487,7 @@ function openSettings(){
         ${listEditor('bots','Bots','Editing here updates the manager grid and the annotator tree.')}
         ${listEditor('annotators','Annotators','The team who can be assigned to bots, dates, or episodes.')}
         ${listEditor('taskCodes','Task codes','Options in the task dropdown.')}
-        <div class="settings-block"><h4>Assignment engine</h4><p>Full-timer queue size (fresh episodes) and freelancer queue size (backlog). Refilled on login and on completion.</p><div style="display:flex;gap:16px;flex-wrap:wrap"><label class="qlab">Full-timer <input type="number" id="qSize" min="1" max="50" value="${state.queueSize||5}"></label><label class="qlab">Freelancer <input type="number" id="qSizeF" min="1" max="50" value="${state.freelancerQueueSize||6}"></label></div><p style="margin-top:12px">Bot preferences are set per person in Supabase (profiles.preferred_bot) via the Stage 1 roster script.</p></div>
+        <div class="settings-block"><h4>Assignment engine</h4><p>Queue sizes are handed out at login. After that the queue is only refilled when it runs <b>empty</b>, and then a whole <b>refill batch</b> is given at once — so annotators get a contiguous block instead of one episode at a time.</p><div style="display:flex;gap:16px;flex-wrap:wrap"><label class="qlab">Full-timer <input type="number" id="qSize" min="1" max="50" value="${state.queueSize||5}"></label><label class="qlab">Freelancer <input type="number" id="qSizeF" min="1" max="50" value="${state.freelancerQueueSize||6}"></label><label class="qlab">Refill batch <input type="number" id="qBatch" min="1" max="50" value="${state.batchSize||5}"></label></div><p style="margin-top:12px">Bot preferences are set per person in Supabase (profiles.preferred_bot) via the Stage 1 roster script.</p></div>
         <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:16px"><button class="btn btn-danger btn-sm" id="resetAll">Reset all data</button><span style="font-size:11.5px;color:var(--ink-soft);margin-left:8px">Wipes episodes and assignments back to defaults.</span></div>
       </div></div></div></div>`;
   const sc=settingsModal.querySelector('#sScrim');sc.addEventListener('click',e=>{if(e.target===sc)closeSettings();});
@@ -1493,6 +1496,7 @@ function openSettings(){
   wireListEditors();wireCloud();
   const qs=settingsModal.querySelector('#qSize');if(qs)qs.addEventListener('change',e=>{const v=Math.max(1,Math.min(50,parseInt(e.target.value||'5',10)||5));state.queueSize=v;e.target.value=v;save();toast('Full-timer queue set to '+v);});
   const qsf=settingsModal.querySelector('#qSizeF');if(qsf)qsf.addEventListener('change',e=>{const v=Math.max(1,Math.min(50,parseInt(e.target.value||'6',10)||6));state.freelancerQueueSize=v;e.target.value=v;save();toast('Freelancer queue set to '+v);});
+  const qb=settingsModal.querySelector('#qBatch');if(qb)qb.addEventListener('change',e=>{const v=Math.max(1,Math.min(50,parseInt(e.target.value||'5',10)||5));state.batchSize=v;e.target.value=v;save();toast('Refill batch set to '+v);});
 }
 function closeSettings(){settingsModal.innerHTML='';}
 function listEditor(key,title,desc){return `<div class="settings-block" data-list="${key}"><h4>${title}</h4><p>${desc}</p>
