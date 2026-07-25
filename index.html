@@ -441,7 +441,7 @@
     <div class="modeswitch" id="modeswitch">
       <button data-mode="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
       <button data-mode="manager" id="tabManager" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
-      <button data-mode="annotator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Annotator</button>
+      <button data-mode="annotator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Episodes</button>
       <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
     <div class="userchip" id="userChip" style="display:none"><span class="uc-name" id="userName"></span><span class="uc-role" id="userRole"></span><button class="icon-btn" id="btnSignOut" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button></div>
@@ -1146,6 +1146,34 @@ function renderDashboard(){
 }
 
 function tlHM(iso){if(!iso||iso.indexOf('T')<0)return '—';const p=iso.split('T')[1].split(':');let hh=+p[0];const ap=hh>=12?'pm':'am';hh=hh%12||12;return hh+':'+p[1]+' '+ap;}
+function importTimeCSV(text){
+  let added=0,skipped=0;
+  const have=new Set(state.timeEntries.map(t=>t.person+'|'+t.day+'|'+(t.start||'')));
+  const toMin=s=>{const m=(s||'').trim().match(/^(\d{1,2}):(\d{2})/);return m?(+m[1])*60+(+m[2]):null;};
+  const mk=(d,mins)=>mins==null?'':d+'T'+String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+  for(const raw of text.split(/\r?\n/)){
+    if(!raw.trim())continue;
+    const c=splitCSVLine(raw);
+    if(c.length<2)continue;
+    const person=(c[0]||'').trim();
+    if(/^(name|person|annotator)$/i.test(person)){skipped++;continue;}
+    const day=normDate((c[1]||'').trim());
+    if(!person||!day){skipped++;continue;}
+    const sRaw=(c[2]||'').trim(),eRaw=(c[3]||'').trim();
+    const sm=toMin(sRaw),em=toMin(eRaw);
+    const start=mk(day,sm);
+    const key=person+'|'+day+'|'+start;
+    if(have.has(key)){skipped++;continue;}
+    let minutes=parseFloat((c[4]||'').trim());
+    if(isNaN(minutes)){minutes=(sm!=null&&em!=null)?(em>=sm?em-sm:(1440-sm+em)):0;}
+    else{minutes=Math.round(minutes*60);}
+    const ent={id:uid(),person,day,start,end:mk(day,em),minutes:Math.max(0,minutes)};
+    state.timeEntries.push(ent);pendingTimeAdds.add(ent.id);have.add(key);added++;
+    if(!state.annotators.includes(person))state.annotators.push(person);
+  }
+  if(added){savePendAdds();save();persistLocal&&persistLocal();scheduleCloudSync&&scheduleCloudSync();}
+  return{added,skipped};
+}
 function renderTimeLog(){
   const TLLIM=150;
   const mineOnly=isManager()?'':(myAnnotatorName()||me.name||'');
@@ -1167,7 +1195,7 @@ function renderTimeLog(){
      <div class="wallclock"><div class="wc-time" id="wallTime"></div><div class="wc-date" id="wallDate"></div></div>
    </div>`}
    <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${filtered.length>TLLIM?' · showing '+TLLIM:''}</span>
-     ${isManager()?`<button class="btn btn-sm" id="tlAdd" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
+     ${isManager()?`<button class="btn btn-sm" id="tlCsvBtn" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Import CSV</button><input type="file" id="tlCsvFile" accept=".csv,text/csv" style="display:none"><button class="btn btn-sm" id="tlAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
      ${mineOnly?`<span class="hint" style="margin-left:auto">${esc(mineOnly)}</span>`:`<select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select>`}</div>
    <div class="tl-table" id="tlTable"><div class="tl-cols"><div>Date</div><div>Annotator</div><div>Time In</div><div>Time Out</div><div>Hours</div><div></div></div>
      ${list.map(t=>isManager()?`<div class="tl-row${t.start&&!t.end?' open':''}" data-id="${t.id}">
@@ -1197,6 +1225,12 @@ function renderTimeLog(){
   }
   const tlf=app.querySelector('#tlFilterSel');if(tlf)tlf.addEventListener('change',e=>{tlFilter=e.target.value;renderTimeLog();});
   const tlAddBtn=app.querySelector('#tlAdd');if(tlAddBtn)tlAddBtn.addEventListener('click',addTimeEntry);
+  const tcb=app.querySelector('#tlCsvBtn');const tcf=app.querySelector('#tlCsvFile');
+  if(tcb&&tcf){tcb.addEventListener('click',()=>tcf.click());
+    tcf.addEventListener('change',ev=>{const f=ev.target.files[0];if(!f){return;}
+      const rd=new FileReader();
+      rd.onload=()=>{try{const r=importTimeCSV(String(rd.result||''));renderTimeLog();toast(`Imported ${r.added} · skipped ${r.skipped}`);}catch(err){console.error('csv',err);toast('Could not read that CSV');}};
+      rd.readAsText(f);ev.target.value='';});}
   const tbl=app.querySelector('#tlTable');
   if(!isManager()){tickWallClock();return;}
   tbl.addEventListener('change',e=>{const inp=e.target.closest('.tl-in');if(!inp)return;const row=inp.closest('[data-id]');const t=state.timeEntries.find(x=>x.id===row.dataset.id);if(!t)return;const f=inp.dataset.f;
@@ -1232,16 +1266,13 @@ function renderManager(){
     </div>
     <div class="section-head"><h2>Bots</h2></div>
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>
-    <div class="section-head" style="margin-top:26px"><h2>Freelancer backlog</h2><span class="hint" id="backlogCount">—</span></div>
+    <div class="section-head" style="margin-top:26px"><h2>Freelancer output</h2></div>
     <div id="flPanel" class="fl-panel"><div class="hint">Loading freelancer output…</div></div>`;
   app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>{mgrBot=c.dataset.bot;mgrDay=null;selectedIds.clear();addOpen=false;render();}));
   loadManagerEngineStats();
 }
 async function loadManagerEngineStats(){
   if(!CLOUD||!session||!engineOk)return;
-  try{const bc=await sbRpc('backlog_count',{});const n=Array.isArray(bc)?bc[0]:bc;
-    const el=document.getElementById('backlogCount');if(el)el.textContent=(n||0)+' episodes waiting for freelancers';
-  }catch(e){console.error('backlog',e);}
   try{const rows=await sbRpc('freelancer_counts',{p_from:'',p_to:''});
     const el=document.getElementById('flPanel');if(!el)return;
     if(!Array.isArray(rows)||!rows.length){el.innerHTML='<div class="hint">No freelancer episodes completed yet.</div>';return;}
