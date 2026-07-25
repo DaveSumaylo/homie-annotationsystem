@@ -439,9 +439,9 @@
       <div class="brand-txt"><b>PROJECT HOMIE</b><span>ANNOTATION SYSTEM</span></div>
     </div>
     <div class="modeswitch" id="modeswitch">
-      <button data-mode="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
+      <button data-mode="dashboard" id="tabDashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
       <button data-mode="manager" id="tabManager" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
-      <button data-mode="annotator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Episodes</button>
+      <button data-mode="annotator" id="tabEpisodes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Episodes</button>
       <button id="tabBacklog" data-mode="backlog" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>Backlog</button>
       <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
@@ -522,7 +522,7 @@ const drawerMonthOpen=new Set();  // manager drawer month groups EXPANDED (defau
 const collapsedBots=new Set();    // tree: bots open unless listed
 const openMonths=new Set();       // tree: months closed unless listed ('Bot|YYYY-MM')
 let sel={bot:null,day:null};      // selected day in tree
-let bsel={bot:null,day:null};     // selected day in BACKLOG tree
+let bsel={bot:null,day:null,epId:null};  // BACKLOG: selected day, or a single episode from My Queue
 const blCollapsed=new Set();      // backlog tree: bots open unless listed
 const blOpenMonths=new Set();     // backlog tree: open months
 let botFilter='';
@@ -618,7 +618,10 @@ function applyRole(){
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
+  const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
+  const tdash=document.getElementById('tabDashboard');if(tdash)tdash.style.display=isFreelancer()?'none':'';
   if(!(isManager()||isFreelancer())&&mode==='backlog'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(isFreelancer()&&mode!=='backlog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}  /* freelancer: backlog-only workspace */
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
   if(!isManager()&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
@@ -1511,6 +1514,17 @@ function backlogTreeBot(bot){
 }
 
 function backlogDetail(bot,day){
+  if(bsel.epId){                                   /* single episode opened from My Queue */
+    const e=state.episodes.find(x=>x.id===bsel.epId);
+    if(!e||e.done) return `<div class="empty-state"><h3>Done 🎉</h3><p>That episode is complete. Pick another from your queue or the backlog.</p></div>`;
+    return `<div class="detail-head"><span class="dh-emoji">${botIcon(e.bot)}</span>
+      <div><div class="dh-title">${esc(e.bot)}</div><div class="dh-sub">${prettyDate(dayOf(e))} · my queue</div></div>
+      <div class="dh-prog"><span class="dh-frac">1 episode</span></div></div>
+    <div class="gscroll ${isManager()?'':'ro-view'}"><div class="ginner">
+      <div class="gcols"><div></div><div>Episode name</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>Done</div><div></div></div>
+      ${gridRow(e)}
+    </div></div>`;
+  }
   if(!day||!bot) return `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg><h3>No date selected</h3><p>Pick a bot and date on the left to see its backlog episodes.</p></div>`;
   const eps=blDayEpisodes(bot,day);
   return `<div class="detail-head"><span class="dh-emoji">${botIcon(bot)}</span>
@@ -1527,6 +1541,7 @@ function renderBacklog(){
   keepTreeScroll('backlog');
   const anyBacklog=state.bots.some(b=>blEpisodesFor(b).length>0);
   app.innerHTML=`
+    ${(isFreelancer()&&myAnnotatorName())?myQueueBar():''}
     <div class="tree-layout">
       <div class="tree-panel">
         <div class="tree-filter" style="pointer-events:none;opacity:.9"><select disabled><option>BACKLOG · unfinished episodes</option></select></div>
@@ -1537,7 +1552,8 @@ function renderBacklog(){
   restoreTreeScroll('backlog');
   app.querySelectorAll('[data-blbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.blbot;blBotOpen(b)?blCollapsed.add(b):blCollapsed.delete(b);renderBacklog();}));
   app.querySelectorAll('[data-blmonth]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.blmonth;blOpenMonths.has(k)?blOpenMonths.delete(k):blOpenMonths.add(k);renderBacklog();}));
-  app.querySelectorAll('[data-blday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.blday.split('|');bsel={bot:b,day:d};selectedIds.clear();renderBacklog();}));
+  app.querySelectorAll('[data-blday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.blday.split('|');bsel={bot:b,day:d,epId:null};selectedIds.clear();renderBacklog();}));
+  app.querySelectorAll('[data-q]').forEach(el=>el.addEventListener('click',()=>{bsel={bot:null,day:null,epId:el.dataset.q};selectedIds.clear();renderBacklog();}));
   wireDetail(bsel.bot,()=>bsel.day,renderBacklog);
 }
 
