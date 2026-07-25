@@ -57,7 +57,7 @@
 
   /* ---------- Summary strip ---------- */
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
-  .stat{position:relative;overflow:hidden;background:linear-gradient(160deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-top:2px solid var(--sc,var(--acc));border-radius:14px;padding:16px 18px}.stat::after{content:'';position:absolute;top:-34px;right:-34px;width:92px;height:92px;border-radius:50%;background:var(--sc,var(--acc));opacity:.08;filter:blur(4px)}.stat-ic{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:var(--sc);background:color-mix(in srgb,var(--sc) 15%,transparent);border:1px solid color-mix(in srgb,var(--sc) 32%,transparent)}.stat-ic svg{width:17px;height:17px}
+  .stat{position:relative;overflow:hidden;background:linear-gradient(160deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-top:2px solid var(--sc,var(--acc));border-radius:14px;padding:16px 18px}.stat-ic{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:var(--sc);background:color-mix(in srgb,var(--sc) 15%,transparent);border:1px solid color-mix(in srgb,var(--sc) 32%,transparent)}.stat-ic svg{width:17px;height:17px}
   .stat.s-done{border-top-color:var(--green)} .stat.s-pend{border-top-color:var(--amber)} .stat.s-bots{border-top-color:var(--blue)}
   .stat .k{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.6px}
   .stat .v{font-size:30px;font-weight:800;letter-spacing:-1px;margin-top:4px;color:var(--sc,var(--ink))}
@@ -1045,6 +1045,19 @@ function minutesBetween(a,b){if(!a||!b||a.indexOf('T')<0||b.indexOf('T')<0)retur
 async function pushEntry(t){if(!CLOUD)return;try{await cloudUpsertEntries([t]);syncedTimes.set(t.id,timeSig(t));if(pendingTimeAdds.delete(t.id))savePendAdds();setSyncStatus('synced');}catch(e){setSyncStatus('error',e.message);toast('⚠ TIME ENTRY NOT SYNCED — retrying. '+e.message.slice(0,80));scheduleCloudSync();}}
 async function deleteTimeEntry(id){deletedTimeIds.add(id);saveDeleted();state.timeEntries=state.timeEntries.filter(x=>x.id!==id);save();persistLocal();
   if(CLOUD){try{await sbFetch('time_entries?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});syncedTimes.delete(id);}catch(e){toast('⚠ DELETE NOT SYNCED — retrying');scheduleCloudSync();}}}
+async function removeDuplicateEntries(){
+  const seen=new Map();const dupes=[];
+  // stable order: keep the earliest-created (lowest id sort) as canonical
+  const ordered=state.timeEntries.slice().sort((a,b)=>(a.id<b.id?-1:1));
+  for(const t of ordered){
+    const key=t.person+'|'+t.day+'|'+(t.start||'')+'|'+(t.end||'');
+    if(seen.has(key))dupes.push(t.id); else seen.set(key,t.id);
+  }
+  if(!dupes.length){toast('No duplicate entries found');return;}
+  for(const id of dupes){await deleteTimeEntry(id);}
+  renderTimeLog();
+  toast('Removed '+dupes.length+' duplicate entr'+(dupes.length===1?'y':'ies'));
+}
 function addTimeEntry(){const day=todayISO();const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:'',start:'',end:'',minutes:0,day};state.timeEntries.push(e);pendingTimeAdds.add(e.id);savePendAdds();save();persistLocal();pushEntry(e);renderTimeLog();}
 // Self-healing: every load, re-add any embedded records missing locally (unless user deleted them)
 function seedTimeLogOnce(){
@@ -1234,7 +1247,7 @@ function renderTimeLog(){
      <div class="wallclock"><div class="wc-time" id="wallTime"></div><div class="wc-date" id="wallDate"></div></div>
    </div>`}
    <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${(!tlShowAll&&filtered.length>TLLIM)?' · showing '+TLLIM:(tlShowAll&&filtered.length>TLLIM)?' · showing all':''}</span>${(tlShowAll&&filtered.length>TLLIM)?`<button class="btn btn-sm" id="tlCollapse" style="margin-left:8px">Show recent only</button>`:''}
-     ${isManager()?`<button class="btn btn-sm" id="tlCsvBtn" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Import CSV</button><input type="file" id="tlCsvFile" accept=".csv,text/csv" style="display:none"><button class="btn btn-sm" id="tlAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
+     ${isManager()?`<button class="btn btn-sm" id="tlDedup" style="margin-left:auto" title="Remove exact duplicate shifts">Remove duplicates</button><button class="btn btn-sm" id="tlCsvBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Import CSV</button><input type="file" id="tlCsvFile" accept=".csv,text/csv" style="display:none"><button class="btn btn-sm" id="tlAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
      ${mineOnly?`<span class="hint" style="margin-left:auto">${esc(mineOnly)}</span>`:`<select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select>`}</div>
    <div class="tl-table" id="tlTable"><div class="tl-cols"><div>Date</div><div>Annotator</div><div>Time In</div><div>Time Out</div><div>Hours</div><div></div></div>
      ${list.map(t=>isManager()?`<div class="tl-row${t.start&&!t.end?' open':''}" data-id="${t.id}">
@@ -1255,16 +1268,25 @@ function renderTimeLog(){
    </div>`;
   const bi=app.querySelector('#btnCkIn');const si=app.querySelector('#ckInWho');
   if(bi&&si){
-  bi.addEventListener('click',()=>{const show=si.style.display==='none';si.style.display=show?'':'none';app.querySelector('#ckOutWho').style.display='none';if(show)si.focus();});
-  si.addEventListener('change',e=>{if(e.target.value)clockInPerson(e.target.value);});
-  const bo=app.querySelector('#btnCkOut');const so=app.querySelector('#ckOutWho');
-  if(bo&&!bo.disabled)bo.addEventListener('click',()=>{const show=so.style.display==='none';so.style.display=show?'':'none';si.style.display='none';if(show)so.focus();});
-  so.addEventListener('change',e=>{if(e.target.value)clockOutPerson(e.target.value);});
+  const meName=myAnnotatorName()||((me&&me.name)||'').trim();
+  const selfClock=!isManager()&&!!meName;   /* full-timer: clock self, no dropdown */
+  if(selfClock){
+    bi.addEventListener('click',()=>{clockInPerson(meName);});
+    const bo=app.querySelector('#btnCkOut');
+    if(bo&&!bo.disabled)bo.addEventListener('click',()=>{clockOutPerson(meName);});
+  }else{
+    bi.addEventListener('click',()=>{const show=si.style.display==='none';si.style.display=show?'':'none';app.querySelector('#ckOutWho').style.display='none';if(show)si.focus();});
+    si.addEventListener('change',e=>{if(e.target.value)clockInPerson(e.target.value);});
+    const bo=app.querySelector('#btnCkOut');const so=app.querySelector('#ckOutWho');
+    if(bo&&!bo.disabled)bo.addEventListener('click',()=>{const show=so.style.display==='none';so.style.display=show?'':'none';si.style.display='none';if(show)so.focus();});
+    so.addEventListener('change',e=>{if(e.target.value)clockOutPerson(e.target.value);});
+  }
   tickWallClock();
   }
   const tlf=app.querySelector('#tlFilterSel');if(tlf)tlf.addEventListener('change',e=>{tlFilter=e.target.value;tlShowAll=false;renderTimeLog();});
   const tlc=app.querySelector('#tlCollapse');if(tlc)tlc.addEventListener('click',()=>{tlShowAll=false;renderTimeLog();});
   const tlAddBtn=app.querySelector('#tlAdd');if(tlAddBtn)tlAddBtn.addEventListener('click',addTimeEntry);
+  const tdd=app.querySelector('#tlDedup');if(tdd)tdd.addEventListener('click',()=>{if(confirm('Remove exact duplicate time entries (same person, date, in and out)? One copy of each will be kept.'))removeDuplicateEntries();});
   const tcb=app.querySelector('#tlCsvBtn');const tcf=app.querySelector('#tlCsvFile');
   if(tcb&&tcf){tcb.addEventListener('click',()=>tcf.click());
     tcf.addEventListener('change',ev=>{const f=ev.target.files[0];if(!f){return;}
@@ -1392,7 +1414,7 @@ function bulkBar(bot,day){
   return `<div class="bulkbar">
     <span class="bb-n">${selectedIds.size} selected</span>
     <select id="bbTask"><option value="">TASK CODE</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
-    <select id="bbAsg"><option value="">ASSIGNEE</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+    <select id="bbAsg"><option value="">ASSIGNEE</option><option value="__CLEAR__">— (clear)</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
     ${isManager()?'<button class="btn btn-sm" id="bbBacklog">⇢ Send to backlog</button>':''}
     <button class="btn btn-sm" id="bbClear">✕ Clear</button>
   </div>`;
@@ -1441,7 +1463,7 @@ function wireDetail(bot,getDay,rerender){
   const at=dp.querySelector('#addToggle');if(at)at.addEventListener('click',()=>{addOpen=!addOpen;rerender();});
   const ag=dp.querySelector('#addGo');if(ag)ag.addEventListener('click',()=>{const ta=dp.querySelector('#addTa');if(!ta.value.trim()){toast('Paste episode names first');return;}const r=addEpisodes(bot,ta.value);addOpen=false;rerender();toast(`Added ${r.added}${r.skipped?` · ${r.skipped} duplicate skipped`:''}`);});
   const bt=dp.querySelector('#bbTask');if(bt)bt.addEventListener('change',e=>{if(!e.target.value)return;bulkSetTask(selectedIds,e.target.value);rerender();toast('Task code set on '+selectedIds.size);});
-  const ba=dp.querySelector('#bbAsg');if(ba)ba.addEventListener('change',e=>{if(!e.target.value)return;bulkSetAssignee(selectedIds,e.target.value);rerender();toast('Assignee set on '+selectedIds.size);});
+  const ba=dp.querySelector('#bbAsg');if(ba)ba.addEventListener('change',e=>{const v=e.target.value;if(!v)return;const val=(v==='__CLEAR__')?'':v;bulkSetAssignee(selectedIds,val);rerender();toast(val?('Assignee set on '+selectedIds.size):('Cleared assignee on '+selectedIds.size));});
   const bb=dp.querySelector('#bbBot');if(bb)bb.addEventListener('change',e=>{if(!e.target.value)return;const n=selectedIds.size;bulkMoveBot(selectedIds,e.target.value);const tgt=e.target.value;selectedIds.clear();rerender();toast('Moved '+n+' to '+tgt);});
   const bg=dp.querySelector('#bbDateGo');if(bg)bg.addEventListener('click',()=>{const v=dp.querySelector('#bbDate').value;if(!v){toast('Pick a date first');return;}const n=selectedIds.size;bulkMoveDate(selectedIds,v);selectedIds.clear();rerender();toast('Moved '+n+' to '+prettyShort(v));});
   const bbk=dp.querySelector('#bbBacklog');if(bbk)bbk.addEventListener('click',async()=>{const ids=[...selectedIds];if(!ids.length)return;for(const id of ids){const e=state.episodes.find(x=>x.id===id);if(e&&!e.done){e.assignee='';if(state.dayOverrides)delete state.dayOverrides[id];}if(CLOUD&&engineOk)try{await sbRpc('release_episode',{p_id:id});}catch(err){console.error(err);}}selectedIds.clear();save();scheduleCloudSync();rerender();toast(ids.length+' sent to backlog');});
