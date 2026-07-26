@@ -1670,7 +1670,7 @@ function treeBot(bot){
   const botFresh=freshInList(episodesFor(bot));
   return `<div class="trow tbot" data-tbot="${esc(bot)}">
       <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
-      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span>${botFresh>0?`<span class="tnew">NEW ${botFresh}</span>`:''}<span class="tcount">${total}</span></div>
+      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span><span class="tcount">${total}</span></div>
     ${bo?months.map(m=>{const mo=monthOpen(bot,m);const days=daysInMonth(bot,m);
       let md=0,mt=0,mf=0;days.forEach(d=>{const de=dayEpisodes(bot,d);const st=statsOf(de);md+=st.done;mt+=st.total;mf+=freshInList(de);});const minc=md<mt;
       return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span>${mf>0?`<span class="tnew">NEW ${mf}</span>`:''}<span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
