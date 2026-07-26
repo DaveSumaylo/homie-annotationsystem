@@ -167,6 +167,8 @@
   .trow:hover{background:var(--surface-2)}
   .trow .tlabel{font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
   .trow .tcount{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--ink-faint)}
+  .trow .tnew{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:20px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45)}
+  .trow .tnew + .tcount,.trow .tnew + .tclip{margin-left:8px}
   .tbot{font-weight:800;color:var(--ink);padding-left:6px}
   .tbot .bot-emoji{font-size:15px}
   .tmonth{padding-left:26px;color:var(--ink-soft);font-weight:600}
@@ -1661,16 +1663,18 @@ function myQueueBar(){
       :`<span class="myq-empty">No waiting episodes — all caught up 🎉</span>`}
   </div>`;
 }
+function freshInList(eps){return eps.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;}
 function treeBot(bot){
   const bo=botOpen(bot);const total=episodesFor(bot).length;const months=monthsOf(bot);
+  const botFresh=freshInList(episodesFor(bot));
   return `<div class="trow tbot" data-tbot="${esc(bot)}">
       <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
-      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span><span class="tcount">${total}</span></div>
+      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span>${botFresh>0?`<span class="tnew">NEW ${botFresh}</span>`:''}<span class="tcount">${total}</span></div>
     ${bo?months.map(m=>{const mo=monthOpen(bot,m);const days=daysInMonth(bot,m);
-      let md=0,mt=0;days.forEach(d=>{const st=statsOf(dayEpisodes(bot,d));md+=st.done;mt+=st.total;});const minc=md<mt;
-      return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span><span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
-        ${mo?days.map(d=>{const active=sel.bot===bot&&sel.day===d;const st=statsOf(dayEpisodes(bot,d));
-          return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span><span class="tclip ${st.done<st.total?'warn':''}">${st.done<st.total?'⚠️ ':''}${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
+      let md=0,mt=0,mf=0;days.forEach(d=>{const de=dayEpisodes(bot,d);const st=statsOf(de);md+=st.done;mt+=st.total;mf+=freshInList(de);});const minc=md<mt;
+      return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span>${mf>0?`<span class="tnew">NEW ${mf}</span>`:''}<span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
+        ${mo?days.map(d=>{const active=sel.bot===bot&&sel.day===d;const de=dayEpisodes(bot,d);const st=statsOf(de);const df=freshInList(de);
+          return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span>${df>0?`<span class="tnew">NEW ${df}</span>`:''}<span class="tclip ${st.done<st.total?'warn':''}">${st.done<st.total?'⚠️ ':''}${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
 }
 
 /* ---------- Manager bot detail ---------- */
