@@ -256,6 +256,7 @@
   .bc-chk{color:var(--acc);font-weight:800}
   .bc-none{color:var(--ink-faint);font-style:italic;font-size:10.5px}
   .bc-alldone{color:var(--acc);font-size:11px;font-weight:700;text-align:center;padding:10px 0}
+  .row1 .bc-new{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:6px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45)}
   select.asg,select.g-asg{text-align:center;text-align-last:center}
   .tclip.warn{color:#f4b45e!important;background:rgba(245,158,11,.18)!important}
   .month-bar{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:800;color:var(--ink);background:var(--surface-3);border:1px solid var(--border-strong);border-radius:9px;padding:8px 11px;margin:10px 0 6px;cursor:pointer;user-select:none}
@@ -677,7 +678,7 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Supabase '+r.status+' '+t.slice(0,160));}return r;}
 
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
-function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,createdAt:Date.now()};}
+function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),createdAt:Date.now()};}
 function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0);}
 function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
@@ -1381,12 +1382,13 @@ function render(){ if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(is
 function renderManager(){
   if(mgrBot){renderMgrBot();return;}
   const o=overall();
+  const freshTotal=state.episodes.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;
   app.innerHTML=`
     <div class="stats">
       <div class="stat"><div class="k">Total episodes</div><div class="v" style="color:var(--acc)">${o.total}</div><div class="sub">across ${state.bots.length} bots</div></div>
       <div class="stat s-done"><div class="k">Done</div><div class="v" style="color:var(--green)">${o.done}</div><div class="sub">${o.total?Math.round(o.done/o.total*100):0}% complete</div></div>
       <div class="stat s-pend"><div class="k">Pending</div><div class="v" style="color:var(--amber)">${o.pending}</div><div class="sub">awaiting annotation</div></div>
-      <div class="stat s-bots"><div class="k">Active bots</div><div class="v" style="color:var(--blue)">${o.activeBots}</div><div class="sub">have episodes loaded</div></div>
+      <div class="stat s-new"><div class="k">Fresh · new</div><div class="v" style="color:var(--acc)">${freshTotal}</div><div class="sub">unassigned, never touched</div></div>
     </div>
     <div class="section-head"><h2>Bots</h2></div>
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
@@ -1396,6 +1398,7 @@ function assigneeTag(name){return isFulltimeName(name)?'D.A':'FL';}
 function botCard(bot){
   const eps=episodesFor(bot);
   const s=botStats(bot);const pendingTotal=s.total-s.done;
+  const fresh=eps.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;
   // dates that still have unfinished episodes, newest first
   const byDate={};
   eps.forEach(e=>{const d=dayOf(e);(byDate[d]||(byDate[d]=[])).push(e);});
@@ -1419,7 +1422,7 @@ function botCard(bot){
     return `<div class="bc-date"><div class="bc-dhead"><span class="bc-dlabel">${prettyDate(d)}</span><span class="bc-dcount">${done}/${list.length}</span></div>${inner}</div>`;
   }).join('');
   return `<div class="bot-card" data-bot="${esc(bot)}">
-    <div class="row1"><span class="bot-emoji">${botIcon(bot)}</span><h3>${esc(bot)}</h3></div>
+    <div class="row1"><span class="bot-emoji">${botIcon(bot)}</span><h3>${esc(bot)}</h3>${fresh>0?`<span class="bc-new">NEW ${fresh}</span>`:''}</div>
     <div class="bot-stats">
       <div class="bs"><span class="bs-label">Total</span><span class="bs-num">${s.total}</span></div>
       <div class="bs"><span class="bs-label">Done</span><span class="bs-num done">${s.done}</span></div>
