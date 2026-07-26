@@ -647,6 +647,10 @@ function nameRole(name){
   return '';   // unknown -> treated as non-fulltime (safe: won't be counted as D.A)
 }
 function isFulltimeName(name){return nameRole(name)==='fulltime';}
+function fulltimeNames(){
+  const fromMap=Object.keys(roleMap).filter(n=>roleMap[n]==='fulltime');
+  return fromMap.length?fromMap:FULLTIME_FALLBACK.slice();   // fallback until roster loads
+}
 function isFreelancerName(name){return nameRole(name)==='freelancer';}
 function isManager(){return me.role==='manager';}
 function isFreelancer(){return me.role==='freelancer';}
@@ -1154,7 +1158,7 @@ function renderDashboard(){
   const dEps=epDoneOn(day).length,dHrs=hoursOn(d=>d===day),dEph=eph(dEps,dHrs);
   const wEps=epDoneWeek(day).length,wHrs=hoursOn(d=>inWeek(d,day)),wEph=eph(wEps,wHrs);
   const mEps=epDoneMonth(day).length,mHrs=hoursOn(d=>inMonth(d,day)),mEph=eph(mEps,mHrs);
-  const kpi=FULLTIME.map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d).slice(0,10);
+  const kpi=fulltimeNames().map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d).slice(0,10);
   const S=dashSeries(day);
   const wr=isoWeekRange(day);
   const wkAvgArr=S.W.data.slice(0,-1).filter(v=>v>0);const wkAvg=wkAvgArr.length?Math.round(wkAvgArr.reduce((s,v)=>s+v,0)/wkAvgArr.length):0;
