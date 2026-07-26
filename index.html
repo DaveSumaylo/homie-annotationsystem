@@ -166,13 +166,14 @@
   .trow{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;cursor:pointer;user-select:none;white-space:nowrap;transition:.1s}
   .trow:hover{background:var(--surface-2)}
   .trow .tlabel{font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
-  .trow .tcount{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--ink-faint)}
-  .trow .tnew{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:20px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45)}
-  .trow .tnew + .tcount,.trow .tnew + .tclip{margin-left:8px}
+  .trow .tcount{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--ink-faint);flex:none}
+  .trow .tnew{font-size:8.5px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:20px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45);flex:none;margin-left:auto}
+  .trow .tnew ~ .tcount,.trow .tnew ~ .tclip{margin-left:8px}
   .tbot{font-weight:800;color:var(--ink);padding-left:6px}
   .tbot .bot-emoji{font-size:15px}
   .tmonth{padding-left:26px;color:var(--ink-soft);font-weight:600}
   .tmonth .tlabel{font-variant-numeric:tabular-nums}
+  .tmonth .tclip{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-faint);font-variant-numeric:tabular-nums}
   .tday{padding-left:48px;color:var(--ink-soft)}
   .tday svg{color:var(--acc);opacity:.8}
   .tday .tlabel{font-variant-numeric:tabular-nums;font-weight:600}
