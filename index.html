@@ -529,7 +529,7 @@ if(!Array.isArray(state.timeEntries))state.timeEntries=[];
 if(typeof state.batchSize!=='number')state.batchSize=5;
 if(typeof state.listsVersion!=='number')state.listsVersion=0;
 if(typeof state.queueSize!=='number')state.queueSize=10;
-let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog'].includes(m)?m:'dashboard';})();
+let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog'].includes(m)?m:'dashboard';})();
 let openBot=null;
 const drawerOpen=new Set();       // manager drawer date groups that are EXPANDED (default collapsed)
 const drawerMonthOpen=new Set();  // manager drawer month groups EXPANDED (default collapsed)
