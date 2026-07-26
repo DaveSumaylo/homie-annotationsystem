@@ -159,7 +159,7 @@
   select.asg.blank{background:var(--amber-soft);color:var(--amber);border-color:var(--amber-line)}
 
   /* ---------- Annotator: tree + detail ---------- */
-  .tree-layout{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
+  .tree-layout{display:grid;grid-template-columns:330px 1fr;gap:16px;align-items:start}
   .tree-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);position:sticky;top:82px;max-height:calc(100vh - 104px);overflow:auto;padding:8px}
   .tree-filter{padding:6px 6px 10px}
   .tree-filter select{width:100%;font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft)}
@@ -171,13 +171,13 @@
   .trow .tnew ~ .tcount,.trow .tnew ~ .tclip{margin-left:8px}
   .tbot{font-weight:800;color:var(--ink);padding-left:6px}
   .tbot .bot-emoji{font-size:15px}
-  .tmonth{padding-left:26px;color:var(--ink-soft);font-weight:600}
-  .tmonth .tlabel{font-variant-numeric:tabular-nums}
-  .tmonth .tclip{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-faint);font-variant-numeric:tabular-nums}
-  .tday{padding-left:48px;color:var(--ink-soft)}
+  .tmonth{padding-left:18px;color:var(--ink-soft);font-weight:600}
+  .tmonth .tlabel{font-variant-numeric:tabular-nums;flex:none;overflow:visible;text-overflow:clip}
+  .tmonth .tclip{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-faint);font-variant-numeric:tabular-nums;flex:none;white-space:nowrap}
+  .tday{padding-left:38px;color:var(--ink-soft)}
   .tday svg{color:var(--acc);opacity:.8}
-  .tday .tlabel{font-variant-numeric:tabular-nums;font-weight:600}
-  .tday .tclip{margin-left:auto;font-size:10px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:20px;padding:1px 7px}
+  .tday .tlabel{font-variant-numeric:tabular-nums;font-weight:600;flex:none;overflow:visible;text-overflow:clip}
+  .tday .tclip{margin-left:auto;font-size:10px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:20px;padding:1px 7px;flex:none;white-space:nowrap}
   .tday.active{background:var(--acc-soft);color:var(--ink);box-shadow:inset 2px 0 0 var(--acc)}
   .tday.active .tclip{color:var(--acc)}
   .cal{width:14px;height:14px;flex:none}
