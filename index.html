@@ -159,7 +159,7 @@
   select.asg.blank{background:var(--amber-soft);color:var(--amber);border-color:var(--amber-line)}
 
   /* ---------- Annotator: tree + detail ---------- */
-  .tree-layout{display:grid;grid-template-columns:330px 1fr;gap:16px;align-items:start}
+  .tree-layout{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
   .tree-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);position:sticky;top:82px;max-height:calc(100vh - 104px);overflow:auto;padding:8px}
   .tree-filter{padding:6px 6px 10px}
   .tree-filter select{width:100%;font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft)}
@@ -171,13 +171,13 @@
   .trow .tnew ~ .tcount,.trow .tnew ~ .tclip{margin-left:8px}
   .tbot{font-weight:800;color:var(--ink);padding-left:6px}
   .tbot .bot-emoji{font-size:15px}
-  .tmonth{padding-left:18px;color:var(--ink-soft);font-weight:600}
-  .tmonth .tlabel{font-variant-numeric:tabular-nums;flex:none;overflow:visible;text-overflow:clip}
-  .tmonth .tclip{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-faint);font-variant-numeric:tabular-nums;flex:none;white-space:nowrap}
-  .tday{padding-left:38px;color:var(--ink-soft)}
+  .tmonth{padding-left:26px;color:var(--ink-soft);font-weight:600}
+  .tmonth .tlabel{font-variant-numeric:tabular-nums}
+  .tmonth .tclip{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+  .tday{padding-left:48px;color:var(--ink-soft)}
   .tday svg{color:var(--acc);opacity:.8}
-  .tday .tlabel{font-variant-numeric:tabular-nums;font-weight:600;flex:none;overflow:visible;text-overflow:clip}
-  .tday .tclip{margin-left:auto;font-size:10px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:20px;padding:1px 7px;flex:none;white-space:nowrap}
+  .tday .tlabel{font-variant-numeric:tabular-nums;font-weight:600}
+  .tday .tclip{margin-left:auto;font-size:10px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:20px;padding:1px 7px}
   .tday.active{background:var(--acc-soft);color:var(--ink);box-shadow:inset 2px 0 0 var(--acc)}
   .tday.active .tclip{color:var(--acc)}
   .cal{width:14px;height:14px;flex:none}
@@ -990,18 +990,18 @@ function clearBotEpisodes(bot){state.episodes=state.episodes.filter(e=>e.bot!==b
 
 /* ---------- CSV import + one-time Alpha seed ---------- */
 function ensureOption(list,val){if(val&&!state[list].includes(val))state[list].push(val);}
-function upsertEpisodes(bot,records){
+function upsertEpisodes(bot,records,overwrite=true){
   const byName=new Map(episodesFor(bot).map(e=>[e.name,e]));let added=0,updated=0;
   for(const rec of records){if(!rec.name)continue;ensureOption('taskCodes',rec.taskCode);ensureOption('annotators',rec.assignee);
     const ex=byName.get(rec.name);
-    if(ex){ex.taskCode=rec.taskCode||'';ex.assignee=rec.assignee||'';ex.dateLabeled=rec.dateLabeled||'';ex.done=!!rec.done;updated++;}
+    if(ex){if(overwrite){ex.taskCode=rec.taskCode||'';ex.assignee=rec.assignee||'';ex.dateLabeled=rec.dateLabeled||'';ex.done=!!rec.done;updated++;}}
     else{const ep={id:uid(),bot,name:rec.name,taskCode:rec.taskCode||'',assignee:rec.assignee||'',dateLabeled:rec.dateLabeled||'',done:!!rec.done,createdAt:Date.now()};state.episodes.push(ep);byName.set(rec.name,ep);added++;}}
   save();return{added,updated};
 }
 function seedAlphaOnce(){
   if(localStorage.getItem('projectHomie.alphaImported'))return;
   const recs=ALPHA_SEED.map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-  const r=upsertEpisodes('Alpha',recs);localStorage.setItem('projectHomie.alphaImported','1');
+  const r=upsertEpisodes('Alpha',recs,false);localStorage.setItem('projectHomie.alphaImported','1');
   if(r.added)setTimeout(()=>toast('Loaded '+r.added.toLocaleString()+' Alpha episodes'),300);
 }
 function seedBatch2Once(){
@@ -1010,7 +1010,7 @@ function seedBatch2Once(){
   for(const bot of Object.keys(SEED2)){
     if(!state.bots.includes(bot))state.bots.push(bot);
     const recs=SEED2[bot].map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-    total+=upsertEpisodes(bot,recs).added;
+    total+=upsertEpisodes(bot,recs,false).added;
   }
   localStorage.setItem('projectHomie.import2','1');
   if(total)setTimeout(()=>toast('Loaded '+total.toLocaleString()+' episodes · Charlie, Echo, Fox'),600);
@@ -1021,7 +1021,7 @@ function seedBatch3Once(){
   for(const bot of Object.keys(SEED3)){
     if(!state.bots.includes(bot))state.bots.push(bot);
     const recs=SEED3[bot].map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-    total+=upsertEpisodes(bot,recs).added;
+    total+=upsertEpisodes(bot,recs,false).added;
   }
   localStorage.setItem('projectHomie.import3','1');
   if(total)setTimeout(()=>toast('Loaded '+total.toLocaleString()+' episodes · Godzilla, Hugo, Igor, Jackie, Kilo'),900);
@@ -1049,7 +1049,7 @@ function seedLlamaOnce(){
   for(const bot of Object.keys(SEED4)){
     if(!state.bots.includes(bot))state.bots.push(bot);
     const recs=SEED4[bot].map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-    total+=upsertEpisodes(bot,recs).added;
+    total+=upsertEpisodes(bot,recs,false).added;
   }
   localStorage.setItem('projectHomie.import4','1');
   if(total)setTimeout(()=>toast('Loaded '+total+' Llama episodes'),1200);
@@ -1670,7 +1670,7 @@ function treeBot(bot){
   const botFresh=freshInList(episodesFor(bot));
   return `<div class="trow tbot" data-tbot="${esc(bot)}">
       <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
-      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span><span class="tcount">${total}</span></div>
+      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span>${botFresh>0?`<span class="tnew">NEW ${botFresh}</span>`:''}<span class="tcount">${total}</span></div>
     ${bo?months.map(m=>{const mo=monthOpen(bot,m);const days=daysInMonth(bot,m);
       let md=0,mt=0,mf=0;days.forEach(d=>{const de=dayEpisodes(bot,d);const st=statsOf(de);md+=st.done;mt+=st.total;mf+=freshInList(de);});const minc=md<mt;
       return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span>${mf>0?`<span class="tnew">NEW ${mf}</span>`:''}<span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
