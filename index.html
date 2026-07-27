@@ -1559,7 +1559,7 @@ function wireDetail(bot,getDay,rerender){
     if(t.dataset.task!==undefined){setTaskCode(t.dataset.task,t.value);return;}
     if(t.dataset.asg!==undefined){assignEpisode(t.dataset.asg,t.value);recolorAsg(t);return;}
     if(t.dataset.date!==undefined){setDate(t.dataset.date,t.value);return;}
-    if(t.dataset.done!==undefined){toggleDone(t.dataset.done,t.checked);if(t.checked)engineOnComplete(t.dataset.done);rerender();return;}
+    if(t.dataset.done!==undefined){toggleDone(t.dataset.done,t.checked);if(t.checked&&!isManager())engineOnComplete(t.dataset.done);rerender();return;}
   });
   dp.addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;deleteEpisode(b.dataset.del);selectedIds.delete(b.dataset.del);rerender();});
 }
