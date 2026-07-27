@@ -169,6 +169,9 @@
   .trow .tcount{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--ink-faint);flex:none}
   .trow .tnew{font-size:8.5px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:20px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45);flex:none;margin-left:auto}
   .trow .tnew ~ .tcount,.trow .tnew ~ .tclip{margin-left:8px}
+  .trow .tnew ~ .tnew{margin-left:4px}
+  .trow .tnew.tn-fresh{background:rgba(16,168,116,.2);color:var(--acc);border-color:rgba(16,168,116,.45)}
+  .trow .tnew.tn-bklg{background:rgba(245,158,11,.16);color:#f4b45e;border-color:rgba(245,158,11,.4)}
   .tbot{font-weight:800;color:var(--ink);padding-left:6px}
   .tbot .bot-emoji{font-size:15px}
   .tmonth{padding-left:18px;color:var(--ink-soft);font-weight:600}
@@ -260,6 +263,14 @@
   .bc-none{color:var(--ink-faint);font-style:italic;font-size:10.5px}
   .bc-alldone{color:var(--acc);font-size:11px;font-weight:700;text-align:center;padding:10px 0}
   .row1 .bc-new{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:6px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45)}
+  .row1 .bc-pools{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .bc-pool{font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:6px;border:1px solid;white-space:nowrap}
+  .bc-pool.bc-fresh{background:rgba(16,168,116,.2);color:var(--acc);border-color:rgba(16,168,116,.45)}
+  .bc-pool.bc-bklg{background:rgba(245,158,11,.16);color:#f4b45e;border-color:rgba(245,158,11,.4)}
+  .bc-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
+  .bc-dot.fresh{background:var(--acc)}
+  .bc-dot.bklg{background:#f4b45e}
+  .bc-p.bc-bklg-row .bc-pn{color:#f4b45e}
   select.asg,select.g-asg{text-align:center;text-align-last:center}
   .tclip.warn{color:#f4b45e!important;background:rgba(245,158,11,.18)!important}
   .month-bar{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:800;color:var(--ink);background:var(--surface-3);border:1px solid var(--border-strong);border-radius:9px;padding:8px 11px;margin:10px 0 6px;cursor:pointer;user-select:none}
@@ -681,8 +692,8 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Supabase '+r.status+' '+t.slice(0,160));}return r;}
 
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
-function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),createdAt:Date.now()};}
-function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0);}
+function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),status:(r.status||'waiting'),createdAt:Date.now()};}
+function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0)+'|'+(e.status||'');} // status included so waiting↔backlog pool moves refresh the manager view live (client never WRITES status — epToRow omits it, trigger stays authoritative)
 function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
@@ -1402,13 +1413,15 @@ function render(){ if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(is
 function renderManager(){
   if(mgrBot){renderMgrBot();return;}
   const o=overall();
-  const freshTotal=state.episodes.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;
+  const unAll=state.episodes.filter(e=>!e.done&&!(e.assignee&&e.assignee.trim()));
+  const waitingTotal=unAll.filter(e=>e.status!=='backlog').length; // fresh → full-timers
+  const backlogTotal=unAll.filter(e=>e.status==='backlog').length;  // backlog → freelancers
   app.innerHTML=`
     <div class="stats">
       <div class="stat"><div class="k">Total episodes</div><div class="v" style="color:var(--acc)">${o.total}</div><div class="sub">across ${state.bots.length} bots</div></div>
       <div class="stat s-done"><div class="k">Done</div><div class="v" style="color:var(--green)">${o.done}</div><div class="sub">${o.total?Math.round(o.done/o.total*100):0}% complete</div></div>
       <div class="stat s-pend"><div class="k">Pending</div><div class="v" style="color:var(--amber)">${o.pending}</div><div class="sub">awaiting annotation</div></div>
-      <div class="stat s-new"><div class="k">Fresh · new</div><div class="v" style="color:var(--acc)">${freshTotal}</div><div class="sub">unassigned, never touched</div></div>
+      <div class="stat s-new"><div class="k">Fresh · waiting</div><div class="v" style="color:var(--acc)">${waitingTotal}</div><div class="sub">for full-timers · ${backlogTotal} in backlog</div></div>
     </div>
     <div class="section-head"><h2>Bots</h2></div>
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
@@ -1418,7 +1431,12 @@ function assigneeTag(name){return isFulltimeName(name)?'D.A':'FL';}
 function botCard(bot){
   const eps=episodesFor(bot);
   const s=botStats(bot);const pendingTotal=s.total-s.done;
-  const fresh=eps.filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())).length; // NEW badge = all unassigned backlog (unfinished + unassigned), matches the backlog rows below
+  // An unassigned + not-done episode is always either 'waiting' (fresh → full-timers)
+  // or 'backlog' (released → freelancers). Anything not explicitly 'backlog' is fresh.
+  const isBklg=e=>e.status==='backlog';
+  const unEps=eps.filter(e=>!e.done&&!(e.assignee&&e.assignee.trim()));
+  const freshCount=unEps.filter(e=>!isBklg(e)).length; // waiting pool → full-timers
+  const bklgCount=unEps.filter(e=>isBklg(e)).length;    // backlog pool → freelancers
   // dates that still have unfinished episodes, newest first
   const byDate={};
   eps.forEach(e=>{const d=dayOf(e);(byDate[d]||(byDate[d]=[])).push(e);});
@@ -1426,10 +1444,10 @@ function botCard(bot){
   const rowsHtml=openDates.map(d=>{
     const list=byDate[d];const done=list.filter(e=>e.done).length;
     // per-assignee: done + pending counts
-    const agg={};let unassigned=0;
+    const agg={};let uWait=0,uBklg=0;
     list.forEach(e=>{
       const a=(e.assignee||'').trim();
-      if(!a){ if(!e.done)unassigned++; return; }
+      if(!a){ if(!e.done){ if(isBklg(e))uBklg++; else uWait++; } return; }
       const g=agg[a]||(agg[a]={done:0,pend:0});
       if(e.done)g.done++; else g.pend++;
     });
@@ -1437,12 +1455,14 @@ function botCard(bot){
     let inner=people.map(p=>{const g=agg[p];const complete=g.pend===0;
       return `<div class="bc-p"><span class="bc-nm"><b class="bc-tag ${assigneeTag(p)==='D.A'?'da':'fl'}">${assigneeTag(p)}</b> ${esc(p)}</span><span class="bc-pn">${complete?`${g.done} <span class="bc-chk">✓</span>`:`${g.pend}`}</span></div>`;
     }).join('');
-    if(unassigned>0)inner+=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned backlog</span><span class="bc-pn">${unassigned}</span></div>`;
-    if(!inner)inner=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned backlog</span><span class="bc-pn">0</span></div>`;
+    if(uWait>0)inner+=`<div class="bc-p bc-none"><span class="bc-nm"><span class="bc-dot fresh"></span>Fresh · for full-timers</span><span class="bc-pn">${uWait}</span></div>`;
+    if(uBklg>0)inner+=`<div class="bc-p bc-none bc-bklg-row"><span class="bc-nm"><span class="bc-dot bklg"></span>Backlog · for freelancers</span><span class="bc-pn">${uBklg}</span></div>`;
+    if(!inner)inner=`<div class="bc-p bc-none"><span class="bc-nm">No unassigned work</span><span class="bc-pn">0</span></div>`;
     return `<div class="bc-date"><div class="bc-dhead"><span class="bc-dlabel">${prettyDate(d)}</span><span class="bc-dcount">${done}/${list.length}</span></div>${inner}</div>`;
   }).join('');
+  const poolPills=(freshCount>0||bklgCount>0)?`<span class="bc-pools">${freshCount>0?`<span class="bc-pool bc-fresh">FRESH ${freshCount}</span>`:''}${bklgCount>0?`<span class="bc-pool bc-bklg">BKLG ${bklgCount}</span>`:''}</span>`:'';
   return `<div class="bot-card" data-bot="${esc(bot)}">
-    <div class="row1"><span class="bot-emoji">${botIcon(bot)}</span><h3>${esc(bot)}</h3>${fresh>0?`<span class="bc-new">NEW ${fresh}</span>`:''}</div>
+    <div class="row1"><span class="bot-emoji">${botIcon(bot)}</span><h3>${esc(bot)}</h3>${poolPills}</div>
     <div class="bot-stats">
       <div class="bs"><span class="bs-label">Total</span><span class="bs-num">${s.total}</span></div>
       <div class="bs"><span class="bs-label">Done</span><span class="bs-num done">${s.done}</span></div>
@@ -1682,6 +1702,7 @@ function myQueueBar(){
   </div>`;
 }
 function freshInList(eps){return eps.filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())).length;} // NEW badge = unassigned backlog (unfinished + unassigned)
+function poolCounts(eps){let w=0,b=0;for(const e of eps){if(e.done)continue;if((e.assignee||'').trim())continue;if(e.status==='backlog')b++;else w++;}return{wait:w,bklg:b};} // split the unassigned+unfinished set into fresh(waiting→full-timers) and backlog(→freelancers), same rule as the bot cards
 function treeBot(bot){
   const bo=botOpen(bot);const total=episodesFor(bot).length;const months=monthsOf(bot);
   const botFresh=freshInList(episodesFor(bot));
@@ -1689,10 +1710,10 @@ function treeBot(bot){
       <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
       <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span><span class="tcount">${total}</span></div>
     ${bo?months.map(m=>{const mo=monthOpen(bot,m);const days=daysInMonth(bot,m);
-      let md=0,mt=0,mf=0;days.forEach(d=>{const de=dayEpisodes(bot,d);const st=statsOf(de);md+=st.done;mt+=st.total;mf+=freshInList(de);});const minc=md<mt;
-      return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span>${mf>0?`<span class="tnew">NEW ${mf}</span>`:''}<span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
-        ${mo?days.map(d=>{const active=sel.bot===bot&&sel.day===d;const de=dayEpisodes(bot,d);const st=statsOf(de);const df=freshInList(de);
-          return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span>${df>0?`<span class="tnew">NEW ${df}</span>`:''}<span class="tclip ${st.done<st.total?'warn':''}">${st.done<st.total?'⚠️ ':''}${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
+      let md=0,mt=0,mw=0,mb=0;days.forEach(d=>{const de=dayEpisodes(bot,d);const st=statsOf(de);md+=st.done;mt+=st.total;const pc=poolCounts(de);mw+=pc.wait;mb+=pc.bklg;});const minc=md<mt;
+      return `<div class="trow tmonth" data-tmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span>${mw>0?`<span class="tnew tn-fresh" title="Fresh · waiting (full-timers)">F ${mw}</span>`:''}${mb>0?`<span class="tnew tn-bklg" title="Backlog (freelancers)">B ${mb}</span>`:''}<span class="tclip ${minc?'warn':''}">${minc?'⚠️ ':''}${md}/${mt}</span></div>
+        ${mo?days.map(d=>{const active=sel.bot===bot&&sel.day===d;const de=dayEpisodes(bot,d);const st=statsOf(de);const dp=poolCounts(de);
+          return `<div class="trow tday ${active?'active':''}" data-tday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span>${dp.wait>0?`<span class="tnew tn-fresh" title="Fresh · waiting (full-timers)">F ${dp.wait}</span>`:''}${dp.bklg>0?`<span class="tnew tn-bklg" title="Backlog (freelancers)">B ${dp.bklg}</span>`:''}<span class="tclip ${st.done<st.total?'warn':''}">${st.done<st.total?'⚠️ ':''}${st.done}/${st.total}</span></div>`;}).join(''):''}`;}).join(''):''}`;
 }
 
 /* ---------- Manager bot detail ---------- */
