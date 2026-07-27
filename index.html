@@ -990,18 +990,18 @@ function clearBotEpisodes(bot){state.episodes=state.episodes.filter(e=>e.bot!==b
 
 /* ---------- CSV import + one-time Alpha seed ---------- */
 function ensureOption(list,val){if(val&&!state[list].includes(val))state[list].push(val);}
-function upsertEpisodes(bot,records,overwrite=true){
+function upsertEpisodes(bot,records){
   const byName=new Map(episodesFor(bot).map(e=>[e.name,e]));let added=0,updated=0;
   for(const rec of records){if(!rec.name)continue;ensureOption('taskCodes',rec.taskCode);ensureOption('annotators',rec.assignee);
     const ex=byName.get(rec.name);
-    if(ex){if(overwrite){ex.taskCode=rec.taskCode||'';ex.assignee=rec.assignee||'';ex.dateLabeled=rec.dateLabeled||'';ex.done=!!rec.done;updated++;}}
+    if(ex){ex.taskCode=rec.taskCode||'';ex.assignee=rec.assignee||'';ex.dateLabeled=rec.dateLabeled||'';ex.done=!!rec.done;updated++;}
     else{const ep={id:uid(),bot,name:rec.name,taskCode:rec.taskCode||'',assignee:rec.assignee||'',dateLabeled:rec.dateLabeled||'',done:!!rec.done,createdAt:Date.now()};state.episodes.push(ep);byName.set(rec.name,ep);added++;}}
   save();return{added,updated};
 }
 function seedAlphaOnce(){
   if(localStorage.getItem('projectHomie.alphaImported'))return;
   const recs=ALPHA_SEED.map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-  const r=upsertEpisodes('Alpha',recs,false);localStorage.setItem('projectHomie.alphaImported','1');
+  const r=upsertEpisodes('Alpha',recs);localStorage.setItem('projectHomie.alphaImported','1');
   if(r.added)setTimeout(()=>toast('Loaded '+r.added.toLocaleString()+' Alpha episodes'),300);
 }
 function seedBatch2Once(){
@@ -1010,7 +1010,7 @@ function seedBatch2Once(){
   for(const bot of Object.keys(SEED2)){
     if(!state.bots.includes(bot))state.bots.push(bot);
     const recs=SEED2[bot].map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-    total+=upsertEpisodes(bot,recs,false).added;
+    total+=upsertEpisodes(bot,recs).added;
   }
   localStorage.setItem('projectHomie.import2','1');
   if(total)setTimeout(()=>toast('Loaded '+total.toLocaleString()+' episodes · Charlie, Echo, Fox'),600);
@@ -1021,7 +1021,7 @@ function seedBatch3Once(){
   for(const bot of Object.keys(SEED3)){
     if(!state.bots.includes(bot))state.bots.push(bot);
     const recs=SEED3[bot].map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-    total+=upsertEpisodes(bot,recs,false).added;
+    total+=upsertEpisodes(bot,recs).added;
   }
   localStorage.setItem('projectHomie.import3','1');
   if(total)setTimeout(()=>toast('Loaded '+total.toLocaleString()+' episodes · Godzilla, Hugo, Igor, Jackie, Kilo'),900);
@@ -1049,7 +1049,7 @@ function seedLlamaOnce(){
   for(const bot of Object.keys(SEED4)){
     if(!state.bots.includes(bot))state.bots.push(bot);
     const recs=SEED4[bot].map(a=>({name:a[0],taskCode:a[1],assignee:a[2],dateLabeled:a[3],done:a[4]}));
-    total+=upsertEpisodes(bot,recs,false).added;
+    total+=upsertEpisodes(bot,recs).added;
   }
   localStorage.setItem('projectHomie.import4','1');
   if(total)setTimeout(()=>toast('Loaded '+total+' Llama episodes'),1200);
@@ -1070,7 +1070,24 @@ function clockInPerson(p){
   toast(p+' clocked in · '+tlHM(e.start));
   renderTimeLog();
 }
-function clockOutPerson(p){
+async function releaseUnfinishedToBacklog(p){
+  /* Release ONLY this person's UNFINISHED episodes back to the unassigned backlog.
+     Completed (done) episodes keep their assignee and stay done — they are never
+     touched, cleared, or re-sent to backlog. This mirrors the manager's
+     "send to backlog" action (see #bbBacklog), which guards on !e.done and
+     releases episodes one at a time via the release_episode RPC. We deliberately
+     do NOT use the bulk release_to_backlog RPC, which was also wiping done work. */
+  const unfinished=state.episodes.filter(e=>e.assignee===p && !e.done);
+  if(!unfinished.length){toast('No unfinished episodes to release');return;}
+  unfinished.forEach(e=>{e.assignee='';if(state.dayOverrides)delete state.dayOverrides[e.id];});
+  save();persistLocal();
+  toast(unfinished.length+' unfinished → backlog');
+  if(CLOUD&&session&&engineOk){
+    for(const e of unfinished){try{await sbRpc('release_episode',{p_id:e.id});}catch(err){console.error('release',err);}}
+    scheduleCloudSync();setTimeout(cloudPoll,700);
+  }
+}
+async function clockOutPerson(p){
   if(!p)return;
   const t=state.timeEntries.find(x=>x.person===p&&x.start&&!x.end);
   if(!t){toast('No open shift for '+p);return;}
@@ -1078,7 +1095,7 @@ function clockOutPerson(p){
   const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;
   save();persistLocal();pushEntry(t);
   toast(p+' clocked out · '+fmtHM(t.minutes));
-  if(CLOUD&&session&&engineOk){sbRpc('release_to_backlog',{p_user:p}).then(n=>{const c=Array.isArray(n)?n[0]:n;if(c>0){toast(c+' unfinished → backlog');scheduleCloudSync();setTimeout(cloudPoll,600);}else{toast('No unfinished episodes to release');}}).catch(e=>{toast('⚠ Backlog release failed: '+String(e.message||e).slice(0,60));console.error('release',e);});}
+  releaseUnfinishedToBacklog(p);
   renderTimeLog();
 }
 function tickWallClock(){
@@ -1401,7 +1418,7 @@ function assigneeTag(name){return isFulltimeName(name)?'D.A':'FL';}
 function botCard(bot){
   const eps=episodesFor(bot);
   const s=botStats(bot);const pendingTotal=s.total-s.done;
-  const fresh=eps.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;
+  const fresh=eps.filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())).length; // NEW badge = all unassigned backlog (unfinished + unassigned), matches the backlog rows below
   // dates that still have unfinished episodes, newest first
   const byDate={};
   eps.forEach(e=>{const d=dayOf(e);(byDate[d]||(byDate[d]=[])).push(e);});
@@ -1559,7 +1576,7 @@ function wireDetail(bot,getDay,rerender){
     if(t.dataset.task!==undefined){setTaskCode(t.dataset.task,t.value);return;}
     if(t.dataset.asg!==undefined){assignEpisode(t.dataset.asg,t.value);recolorAsg(t);return;}
     if(t.dataset.date!==undefined){setDate(t.dataset.date,t.value);return;}
-    if(t.dataset.done!==undefined){toggleDone(t.dataset.done,t.checked);if(t.checked&&!isManager())engineOnComplete(t.dataset.done);rerender();return;}
+    if(t.dataset.done!==undefined){toggleDone(t.dataset.done,t.checked);if(t.checked)engineOnComplete(t.dataset.done);rerender();return;}
   });
   dp.addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;deleteEpisode(b.dataset.del);selectedIds.delete(b.dataset.del);rerender();});
 }
@@ -1664,7 +1681,7 @@ function myQueueBar(){
       :`<span class="myq-empty">No waiting episodes — all caught up 🎉</span>`}
   </div>`;
 }
-function freshInList(eps){return eps.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;}
+function freshInList(eps){return eps.filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())).length;} // NEW badge = unassigned backlog (unfinished + unassigned)
 function treeBot(bot){
   const bo=botOpen(bot);const total=episodesFor(bot).length;const months=monthsOf(bot);
   const botFresh=freshInList(episodesFor(bot));
