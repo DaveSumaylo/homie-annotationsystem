@@ -254,6 +254,7 @@
   .bc-nm{display:flex;align-items:center;gap:6px;color:var(--ink)}
   .bc-tag{font-size:8.5px;font-weight:800;letter-spacing:.3px;padding:1px 5px;border-radius:5px;line-height:1.5}
   .bc-tag.da{background:rgba(16,168,116,.18);color:var(--acc);border:1px solid rgba(16,168,116,.35)}
+  .bc-tag.new{background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.5)}
   .bc-tag.fl{background:rgba(180,83,9,.18);color:var(--amber);border:1px solid rgba(180,83,9,.4)}
   .bc-pn{font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
   .bc-chk{color:var(--acc);font-weight:800}
@@ -1413,10 +1414,10 @@ function botCard(bot){
   const rowsHtml=openDates.map(d=>{
     const list=byDate[d];const done=list.filter(e=>e.done).length;
     // per-assignee: done + pending counts
-    const agg={};let unassigned=0;
+    const agg={};let freshCt=0,backlogCt=0;
     list.forEach(e=>{
       const a=(e.assignee||'').trim();
-      if(!a){ if(!e.done)unassigned++; return; }
+      if(!a){ if(!e.done){ if(e.isNew)freshCt++; else backlogCt++; } return; }
       const g=agg[a]||(agg[a]={done:0,pend:0});
       if(e.done)g.done++; else g.pend++;
     });
@@ -1424,8 +1425,9 @@ function botCard(bot){
     let inner=people.map(p=>{const g=agg[p];const complete=g.pend===0;
       return `<div class="bc-p"><span class="bc-nm"><b class="bc-tag ${assigneeTag(p)==='D.A'?'da':'fl'}">${assigneeTag(p)}</b> ${esc(p)}</span><span class="bc-pn">${complete?`${g.done} <span class="bc-chk">✓</span>`:`${g.pend}`}</span></div>`;
     }).join('');
-    if(unassigned>0)inner+=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned backlog</span><span class="bc-pn">${unassigned}</span></div>`;
-    if(!inner)inner=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned backlog</span><span class="bc-pn">0</span></div>`;
+    if(freshCt>0)inner+=`<div class="bc-p"><span class="bc-nm"><b class="bc-tag new">NEW</b> Fresh</span><span class="bc-pn">${freshCt}</span></div>`;
+    if(backlogCt>0)inner+=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned</span><span class="bc-pn">${backlogCt}</span></div>`;
+    if(!inner)inner=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned</span><span class="bc-pn">0</span></div>`;
     return `<div class="bc-date"><div class="bc-dhead"><span class="bc-dlabel">${prettyDate(d)}</span><span class="bc-dcount">${done}/${list.length}</span></div>${inner}</div>`;
   }).join('');
   return `<div class="bot-card" data-bot="${esc(bot)}">
@@ -1569,7 +1571,7 @@ function wireDetail(bot,getDay,rerender){
 }
 
 /* ---------- Backlog tab (freelancers): pending episodes grouped by bot ---------- */
-function blEpisodesFor(bot){return episodesFor(bot).filter(e=>!e.done&&!(e.assignee&&e.assignee.trim()));}  /* backlog = unfinished AND unassigned (released to backlog); an assignee still working keeps their name and is hidden */
+function blEpisodesFor(bot){return episodesFor(bot).filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())&&!e.isNew);}  /* true backlog only: unfinished, unassigned, and NOT fresh (is_new) — fresh belongs to full-timers */
 function blDaysOf(bot){return [...new Set(blEpisodesFor(bot).map(dayOf))].sort((a,b)=>a<b?1:-1);}  /* newest first */
 function blMonthsOf(bot){return [...new Set(blDaysOf(bot).map(d=>d==='Undated'?'Undated':d.slice(0,7)))].sort((a,b)=>a<b?1:-1);}
 function blDaysInMonth(bot,m){return blDaysOf(bot).filter(d=>(d==='Undated'?'Undated':d.slice(0,7))===m);}
