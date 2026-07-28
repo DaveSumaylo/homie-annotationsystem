@@ -750,7 +750,11 @@ async function fullEpisodeResync(){
   const cmap=new Map(rows.map(r=>[r.id,r]));
   const pendEdits=new Map(state.episodes.filter(e=>cmap.has(e.id)&&epSig(e)!==syncedEps.get(e.id)).map(e=>[e.id,e]));
   const keepAdds=state.episodes.filter(e=>!cmap.has(e.id)&&epSig(e)!==syncedEps.get(e.id));
-  state.episodes=rows.filter(r=>!pendingEpDeletes.has(r.id)).map(r=>pendEdits.get(r.id)||rowToEp(r)).concat(keepAdds);
+  state.episodes=rows.filter(r=>!pendingEpDeletes.has(r.id)).map(r=>{
+    const pe=pendEdits.get(r.id);
+    if(pe){pe.isNew=(r.is_new===true);return pe;}   /* keep local edit, take server is_new */
+    return rowToEp(r);
+  }).concat(keepAdds);
   syncedEps=new Map(rows.map(r=>{const e=rowToEp(r);return [e.id,epSig(e)];}));
 }
 async function fullTimeResync(){
@@ -793,6 +797,9 @@ async function cloudPoll(){
           if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);syncedEps.set(inc.id,epSig(inc));dirty=true;}
           else{const pending=epSig(cur)!==syncedEps.get(cur.id);
             if(!pending&&epSig(cur)!==epSig(inc)){Object.assign(cur,inc);dirty=true;}
+            /* is_new is server-owned and not part of epSig — adopt it always,
+               otherwise a fresh→backlog flip (no assignee change) is never seen */
+            if(cur.isNew!==inc.isNew){cur.isNew=inc.isNew;dirty=true;}
             syncedEps.set(inc.id,epSig(inc));}
         }
       }
