@@ -894,7 +894,7 @@ function wireCloud(){
 
 /* ---------- mutations ---------- */
 function addEpisodes(bot,text){const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);const existing=new Set(episodesFor(bot).map(e=>e.name));const def='';/* Phase 1: pasted episodes land as Waiting so the engine assigns them */let added=0;
-  for(const name of lines){if(existing.has(name))continue;existing.add(name);state.episodes.push({id:uid(),bot,name,taskCode:'',assignee:def,dateLabeled:'',done:false});added++;}save();return{added,skipped:lines.length-added};}
+  for(const name of lines){if(existing.has(name))continue;existing.add(name);state.episodes.push({id:uid(),bot,name,taskCode:'',assignee:def,dateLabeled:'',done:false,isNew:true});added++;}save();return{added,skipped:lines.length-added};}
 
 /* ---------- CSV import (sheet format: title row, header, rows) ---------- */
 const MONTHS={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12',
@@ -996,7 +996,7 @@ function upsertEpisodes(bot,records,overwrite=true){
   for(const rec of records){if(!rec.name)continue;ensureOption('taskCodes',rec.taskCode);ensureOption('annotators',rec.assignee);
     const ex=byName.get(rec.name);
     if(ex){if(overwrite){ex.taskCode=rec.taskCode||'';ex.assignee=rec.assignee||'';ex.dateLabeled=rec.dateLabeled||'';ex.done=!!rec.done;updated++;}}
-    else{const ep={id:uid(),bot,name:rec.name,taskCode:rec.taskCode||'',assignee:rec.assignee||'',dateLabeled:rec.dateLabeled||'',done:!!rec.done,createdAt:Date.now()};state.episodes.push(ep);byName.set(rec.name,ep);added++;}}
+    else{const ep={id:uid(),bot,name:rec.name,taskCode:rec.taskCode||'',assignee:rec.assignee||'',dateLabeled:rec.dateLabeled||'',done:!!rec.done,isNew:!(rec.assignee||rec.done),createdAt:Date.now()};state.episodes.push(ep);byName.set(rec.name,ep);added++;}}
   save();return{added,updated};
 }
 function seedAlphaOnce(){
