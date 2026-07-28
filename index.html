@@ -857,6 +857,7 @@ async function engineFillQueue(){
   }catch(e){engineFail(e);}}
 async function engineOnComplete(epId){
   if(!CLOUD||!session||!engineOk)return;
+  if(isManager())return;   /* manager account: manual override/edit still persists the done state (via toggleDone upsert), but never triggers an auto-assign refill */
   const e=state.episodes.find(x=>x.id===epId);
   if(!e||!e.assignee||!state.annotators.includes(e.assignee))return;
   if(!isManager()&&!isFreelancer()&&!isOnClock(myAnnotatorName()))return;   /* full-timer must be clocked in to get a refill */
