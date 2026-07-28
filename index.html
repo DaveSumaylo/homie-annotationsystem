@@ -1603,7 +1603,7 @@ function wireDetail(bot,getDay,rerender){
 }
 
 /* ---------- Backlog tab (freelancers): pending episodes grouped by bot ---------- */
-function blEpisodesFor(bot){return episodesFor(bot).filter(e=>!e.done&&!(e.assignee&&e.assignee.trim()));}  /* backlog = unfinished AND unassigned (released to backlog); an assignee still working keeps their name and is hidden */
+function blEpisodesFor(bot){return episodesFor(bot).filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())&&e.status==='backlog');}  /* Backlog tab = the freelancer pool ONLY: unfinished + unassigned + status='backlog' (released via clock-out / send-to-backlog). Fresh 'waiting' episodes belong to full-timers and are intentionally excluded here. */
 function blDaysOf(bot){return [...new Set(blEpisodesFor(bot).map(dayOf))].sort((a,b)=>a<b?1:-1);}  /* newest first */
 function blMonthsOf(bot){return [...new Set(blDaysOf(bot).map(d=>d==='Undated'?'Undated':d.slice(0,7)))].sort((a,b)=>a<b?1:-1);}
 function blDaysInMonth(bot,m){return blDaysOf(bot).filter(d=>(d==='Undated'?'Undated':d.slice(0,7))===m);}
