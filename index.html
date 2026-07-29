@@ -259,6 +259,10 @@
   .bc-pn{font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
   .bc-chk{color:var(--acc);font-weight:800}
   .bc-none{color:var(--ink-faint);font-style:italic;font-size:10.5px}
+  .req-bar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  .btn-req{background:var(--acc);color:#04231a;border:none;font-weight:800;font-size:12px;letter-spacing:.3px;padding:9px 16px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .btn-req:disabled{background:var(--surface-3);color:var(--ink-faint);cursor:not-allowed}
+  .req-hint{font-size:11px;color:var(--ink-faint)}
   .bc-alldone{color:var(--acc);font-size:11px;font-weight:700;text-align:center;padding:10px 0}
   .row1 .bc-new{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:6px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45)}
   select.asg,select.g-asg{text-align:center;text-align-last:center}
@@ -844,14 +848,18 @@ function mergeEngineRows(rows){if(!Array.isArray(rows)||!rows.length)return fals
 function engineFail(e){const m=String((e&&e.message)||'');
   if(m.indexOf('404')>=0||m.toLowerCase().indexOf('function')>=0){if(engineOk){engineOk=false;toast('ASSIGNMENT ENGINE OFF — run the Phase 1 SQL');}}
   else console.error('engine',e);}
-async function engineFillQueue(){
+async function engineFillQueue(opts){
   if(!CLOUD||!session||!engineOk||isManager())return;
   const who=myAnnotatorName();if(!who)return;
   if(!isFreelancer()&&!isOnClock(who))return;   /* full-timer must clock in before any assignment */
+  /* freelancer must explicitly request work — never auto-assigned on load/poll */
+  if(isFreelancer()&&!(opts&&opts.requested))return;
   const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||10);
   try{const rows=await sbRpc('fill_queue',{p_user:who,p_queue:cap});
     if(mergeEngineRows(rows)){toast('MY QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
+    else if(opts&&opts.requested){toast(hasOpenWork(who)?'Finish your current tasks first':'No backlog available right now');}
   }catch(e){engineFail(e);}}
+function hasOpenWork(who){return state.episodes.some(e=>e.assignee===who&&!e.done);}
 async function engineOnComplete(epId){
   if(!CLOUD||!session||!engineOk)return;
   const e=state.episodes.find(x=>x.id===epId);
@@ -1631,7 +1639,16 @@ function backlogDetail(bot,day){
 function renderBacklog(){
   keepTreeScroll('backlog');
   const anyBacklog=state.bots.some(b=>blEpisodesFor(b).length>0);
+  const flMe=isFreelancer()?myAnnotatorName():null;
+  const flOpen=flMe?state.episodes.filter(e=>e.assignee===flMe&&!e.done).length:0;
   app.innerHTML=`
+    ${flMe?`<div class="req-bar">
+      <button class="btn btn-req" id="btnReqTasks" ${flOpen>0?'disabled':''}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M12 5v14M5 12h14"/></svg>
+        I want tasks
+      </button>
+      <span class="req-hint">${flOpen>0?`Finish your current ${flOpen} task${flOpen===1?'':'s'} to request the next batch`:`Click to get your next ${state.freelancerQueueSize||6} backlog episodes`}</span>
+    </div>`:''}
     ${(isFreelancer()&&myAnnotatorName())?myQueueBar():''}
     <div class="tree-layout">
       <div class="tree-panel">
@@ -1641,6 +1658,10 @@ function renderBacklog(){
       <div class="detail-panel">${backlogDetail(bsel.bot,bsel.day)}</div>
     </div>`;
   restoreTreeScroll('backlog');
+  const rq=app.querySelector('#btnReqTasks');
+  if(rq)rq.addEventListener('click',async()=>{rq.disabled=true;rq.textContent='Requesting…';
+    try{await engineFillQueue({requested:true});}catch(e){console.error('request',e);}
+    renderBacklog();});
   app.querySelectorAll('[data-blbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.blbot;blBotOpen(b)?blCollapsed.add(b):blCollapsed.delete(b);renderBacklog();}));
   app.querySelectorAll('[data-blmonth]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.blmonth;blOpenMonths.has(k)?blOpenMonths.delete(k):blOpenMonths.add(k);renderBacklog();}));
   app.querySelectorAll('[data-blday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.blday.split('|');bsel={bot:b,day:d,epId:null};selectedIds.clear();renderBacklog();}));
