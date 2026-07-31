@@ -626,7 +626,9 @@ function assigneeSelect(id,current){const c=current?annoColor(current):null;cons
 function assigneeSelectDate(bot,date,common){const c=common?annoColor(common):null;const style=c?`background:${c.bg};color:${c.fg};border-color:${c.bd}`:'';
   return `<select class="asg ${common?'':'blank'}" data-asgdate="${esc(bot)}|${esc(date)}" style="${style}"><option value="">— Assign all —</option>${state.annotators.map(a=>`<option value="${esc(a)}" ${a===common?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
 function gridAsg(id,current){const c=current?annoColor(current):null;const style=c?`background:${c.bg};color:${c.fg};border-color:${c.bd}`:'';
-  return `<select class="g-asg ${current?'':'blank'}" data-asg="${id}" style="${style}"><option value="">—</option>${state.annotators.map(a=>`<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
+  const names=state.annotators.slice();
+  if(current&&!names.some(a=>a===current))names.push(current);   /* keep assignees not in the settings list (e.g. freelancers) visible */
+  return `<select class="g-asg ${current?'':'blank'}" data-asg="${id}" style="${style}"><option value="">—</option>${names.map(a=>`<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
 
 /* ---------- Supabase cloud sync ---------- */
 let SB=null, CLOUD=false;
@@ -1786,7 +1788,7 @@ function renderQC(){
   app.innerHTML=`
     <div class="tree-layout">
       <div class="tree-panel">
-        <div class="tree-filter"><select id="qcBotFilter"><option value="">ALL BOTS</option>${state.bots.filter(b=>qcEpisodesFor(b).length).map(b=>`<option value="${esc(b)}" ${qcBotFilter===b?'selected':''}>${esc(b)}</option>`).join('')}</select></div>
+        <div class="tree-filter"><select id="qcBotFilter"><option value="">ALL BOTS</option>${state.bots.filter(b=>qcEpisodesFor(b).length).map(b=>`<option value="${esc(b)}" ${qcBotFilter===b?'selected':''}>${botIcon(b)} ${esc(b)}</option>`).join('')}</select></div>
         ${any?state.bots.filter(b=>!qcBotFilter||b===qcBotFilter).map(qcTreeBot).join(''):'<div class="empty-state" style="padding:24px 10px"><h3>Nothing completed yet</h3></div>'}
       </div>
       <div class="detail-panel">${qcDetail(qcSel.bot,qcSel.day)}</div>
