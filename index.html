@@ -726,13 +726,6 @@ function applyRole(){
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
   if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
-  if(isQC()){   /* QC: QC tab + Dashboard + Time Log (clock in/out for records) */
-    ['tabEpisodes','tabBacklog','tabManager','btnSettings'].forEach(function(id){
-      const el=document.getElementById(id);if(el)el.style.display='none';});
-    ['tabQc','tabDashboard','tabTimelog'].forEach(function(id){
-      const el=document.getElementById(id);if(el)el.style.display='';});
-    if(!['qc','dashboard','timelog'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
-  }
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
   const tdash=document.getElementById('tabDashboard');if(tdash)tdash.style.display=isFreelancer()?'none':'';
@@ -742,6 +735,13 @@ function applyRole(){
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
   if(!isManager()&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isFreelancer()&&mode==='timelog'){mode='annotator';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(isQC()){   /* QC: QC tab + Dashboard + Time Log (clock in/out for records) */
+    ['tabEpisodes','tabBacklog','tabManager','btnSettings'].forEach(function(id){
+      const el=document.getElementById(id);if(el)el.style.display='none';});
+    ['tabQc','tabDashboard','tabTimelog'].forEach(function(id){
+      const el=document.getElementById(id);if(el)el.style.display='';});
+    if(!['qc','dashboard','timelog'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
+  }
   document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));
 }
 setInterval(()=>{if(CLOUD&&session)ensureFreshSession();},60000);
