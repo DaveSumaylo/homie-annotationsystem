@@ -265,7 +265,13 @@
   .btn-req{background:var(--acc);color:#04231a;border:none;font-weight:800;font-size:12px;letter-spacing:.3px;padding:9px 16px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
   .btn-req:disabled{background:var(--surface-3);color:var(--ink-faint);cursor:not-allowed}
   .req-hint{font-size:11px;color:var(--ink-faint)}
-  .qc-cols{grid-template-columns:2.2fr .8fr 1fr .9fr 1fr 1.2fr .6fr .9fr}
+  .qc-cols{grid-template-columns:2.2fr .8fr 1fr .9fr 1fr 1.2fr .6fr .95fr}
+  .qc-cols>div:nth-child(2),.qc-cols>div:nth-child(8){text-align:center;justify-content:center}
+  .qc-c{display:flex;align-items:center;justify-content:center}
+  .qc-com{text-align:center;text-align-last:center;font-weight:800;text-transform:uppercase}
+  .qc-com.com-ok{background:rgba(16,168,116,.18);color:var(--acc);border-color:rgba(16,168,116,.5)}
+  .qc-com.com-re{background:rgba(220,38,38,.18);color:#f87171;border-color:rgba(220,38,38,.5)}
+  .qc-com.com-am{background:rgba(180,130,9,.2);color:#fbbf24;border-color:rgba(180,130,9,.5)}
   .qc-row-wrap{border-bottom:1px solid var(--border)}
   .qc-exp{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:11px;padding:0 4px}
   .qc-badge{margin-left:6px;font-size:9px;font-weight:800;background:rgba(180,83,9,.2);color:var(--amber);border:1px solid rgba(180,83,9,.45);border-radius:20px;padding:1px 6px}
@@ -1692,7 +1698,7 @@ const QC_CODES=[['101','Unlabeled Actions'],['102','Missing Main Task / Fail Tas
  ['104','Missing "end"'],['105','Missing Moving Action (Start of main task)'],['106','Missing Moving Action (Between subtask)'],
  ['201','Wrong keyword used'],['202','Outdated Keywords'],['301','Human Intervention'],['302','Frozen Image / Fail'],
  ['303','Mislabeled (Labeled wrongly)'],['401','Timestamp/Gap Adjustment Needed']];
-let qcSel={bot:null,day:null};
+let qcSel={bot:null,day:null};let qcBotFilter='';
 const qcCollapsed=new Set(), qcOpenMonths=new Set(), qcExpanded=new Set();
 
 function qcEpisodesFor(bot){return episodesFor(bot).filter(e=>e.done);}   /* completed only */
@@ -1737,23 +1743,29 @@ function qcDetail(bot,day){
       <div class="dh-prog"><span class="dh-frac">${done}/${eps.length} checked</span></div></div>
     <div class="gscroll"><div class="ginner qc-grid">
       <div class="gcols qc-cols"><div>Episode</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>QC name</div><div>Check date</div><div>Checked</div><div>Comment</div></div>
-      ${eps.map(e=>{const open=qcExpanded.has(e.id);const nerr=(e.qcErrors||[]).reduce((s,m)=>s+((m.codes||[]).length),0);
+      ${eps.map(e=>{const open=qcExpanded.has(e.id);const nerr=qcErrCount(e);
         return `<div class="qc-row-wrap">
         <div class="grow qc-cols">
           <div class="ep-ro"><button class="qc-exp" data-qcexp="${e.id}">${open?'▾':'▸'}</button> ${esc(e.name)}${nerr?`<span class="qc-badge">${nerr}</span>`:''}</div>
-          <div class="ep-ro">${esc(e.taskCode||'—')}</div>
+          <div class="ep-ro qc-c">${esc(e.taskCode||'—')}</div>
           <div class="ep-ro">${esc(e.assignee||'—')}</div>
           <div class="ep-ro">${esc(e.dateLabeled||'—')}</div>
           <div class="ep-ro">${esc(e.qcName||'—')}</div>
-          <div class="ep-ro">${e.qcDate?esc(new Date(e.qcDate).toLocaleString()):'—'}</div>
+          <div class="ep-ro">${e.qcDate?esc(qcDateOnly(e.qcDate)):'—'}</div>
           <div><input type="checkbox" class="g-check" data-qcchk="${e.id}" ${e.qcChecked?'checked':''}></div>
-          <div><select class="g-asg" data-qccom="${e.id}"><option value="">—</option>${['OK','Relabel','Amended'].map(o=>`<option ${e.qcComment===o?'selected':''}>${o}</option>`).join('')}</select></div>
+          <div class="qc-c"><select class="g-asg qc-com ${qcComClass(e.qcComment)}" data-qccom="${e.id}"><option value="">—</option>${['OK','RELABEL','AMENDED'].map(o=>`<option ${qcCom(e.qcComment)===o?'selected':''}>${o}</option>`).join('')}</select></div>
         </div>
         ${open?`<div class="qc-detail">${qcErrBlock(e)}</div>`:''}
       </div>`;}).join('')}
     </div></div>`;
 }
 
+function qcCom(v){return (v||'').trim().toUpperCase();}
+function qcComClass(v){const c=qcCom(v);return c==='OK'?'com-ok':c==='RELABEL'?'com-re':c==='AMENDED'?'com-am':'';}
+function qcDateOnly(d){try{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}catch(e){return '';}}
+function qcErrCount(e){return (e.qcErrors||[]).reduce((s,m)=>s+((m.codes||[]).length),0);}
+/* any error code present -> comment auto-set to RELABEL */
+function qcAutoComment(e){if(qcErrCount(e)>0&&qcCom(e.qcComment)!=='RELABEL'){e.qcComment='RELABEL';}}
 function qcSave(){save();scheduleCloudSync();}
 function qcStamp(e){const who=(me&&me.name)||'';if(e.qcChecked){e.qcName=who;e.qcDate=new Date().toISOString();}else{e.qcName='';e.qcDate='';}}
 
@@ -1763,18 +1775,20 @@ function renderQC(){
   app.innerHTML=`
     <div class="tree-layout">
       <div class="tree-panel">
-        <div class="tree-filter" style="pointer-events:none;opacity:.9"><select disabled><option>QC · completed episodes</option></select></div>
-        ${any?state.bots.map(qcTreeBot).join(''):'<div class="empty-state" style="padding:24px 10px"><h3>Nothing completed yet</h3></div>'}
+        <div class="tree-filter"><select id="qcBotFilter"><option value="">ALL BOTS</option>${state.bots.filter(b=>qcEpisodesFor(b).length).map(b=>`<option value="${esc(b)}" ${qcBotFilter===b?'selected':''}>${esc(b)}</option>`).join('')}</select></div>
+        ${any?state.bots.filter(b=>!qcBotFilter||b===qcBotFilter).map(qcTreeBot).join(''):'<div class="empty-state" style="padding:24px 10px"><h3>Nothing completed yet</h3></div>'}
       </div>
       <div class="detail-panel">${qcDetail(qcSel.bot,qcSel.day)}</div>
     </div>`;
   restoreTreeScroll('qc');
+  const qbf=app.querySelector('#qcBotFilter');
+  if(qbf)qbf.addEventListener('change',e=>{qcBotFilter=e.target.value;qcSel={bot:null,day:null};renderQC();});
   app.querySelectorAll('[data-qcbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.qcbot;qcCollapsed.has(b)?qcCollapsed.delete(b):qcCollapsed.add(b);renderQC();}));
   app.querySelectorAll('[data-qcmonth]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.qcmonth;qcOpenMonths.has(k)?qcOpenMonths.delete(k):qcOpenMonths.add(k);renderQC();}));
   app.querySelectorAll('[data-qcday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.qcday.split('|');qcSel={bot:b,day:d};renderQC();}));
   app.querySelectorAll('[data-qcexp]').forEach(el=>el.addEventListener('click',()=>{const id=el.dataset.qcexp;qcExpanded.has(id)?qcExpanded.delete(id):qcExpanded.add(id);renderQC();}));
   app.querySelectorAll('[data-qcchk]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qcchk);if(!e)return;e.qcChecked=ev.target.checked;qcStamp(e);qcSave();renderQC();}));
-  app.querySelectorAll('[data-qccom]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qccom);if(!e)return;e.qcComment=ev.target.value;qcSave();}));
+  app.querySelectorAll('[data-qccom]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qccom);if(!e)return;e.qcComment=qcCom(ev.target.value);qcSave();renderQC();}));
   app.querySelectorAll('[data-qcaddmcap]').forEach(el=>el.addEventListener('click',()=>{
     const id=el.dataset.qcaddmcap;const e=state.episodes.find(x=>x.id===id);if(!e)return;
     const inp=app.querySelector(`[data-qcmcapnum="${id}"]`);const n=parseInt(inp&&inp.value,10);
@@ -1784,15 +1798,15 @@ function renderQC(){
     e.qcErrors.push({mcap:n,codes:[]});e.qcErrors.sort((a,b)=>a.mcap-b.mcap);qcSave();renderQC();}));
   app.querySelectorAll('[data-qcdelmcap]').forEach(el=>el.addEventListener('click',()=>{
     const [id,i]=el.dataset.qcdelmcap.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
-    e.qcErrors.splice(+i,1);qcSave();renderQC();}));
+    e.qcErrors.splice(+i,1);qcAutoComment(e);qcSave();renderQC();}));
   app.querySelectorAll('[data-qccodesel]').forEach(el=>el.addEventListener('change',ev=>{
     const [id,i]=el.dataset.qccodesel.split('|');const v=ev.target.value;if(!v)return;
     const e=state.episodes.find(x=>x.id===id);if(!e)return;const m=e.qcErrors[+i];if(!m)return;
     m.codes=m.codes||[];if(m.codes.includes(v)){toast('Code already added');return;}
-    m.codes.push(v);m.codes.sort();qcSave();renderQC();}));
+    m.codes.push(v);m.codes.sort();qcAutoComment(e);qcSave();renderQC();}));
   app.querySelectorAll('[data-qcdelcode]').forEach(el=>el.addEventListener('click',()=>{
     const [id,i,ci]=el.dataset.qcdelcode.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
-    e.qcErrors[+i].codes.splice(+ci,1);qcSave();renderQC();}));
+    e.qcErrors[+i].codes.splice(+ci,1);qcAutoComment(e);qcSave();renderQC();}));
 }
 
 /* ---------- Annotator ---------- */
