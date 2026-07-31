@@ -1073,6 +1073,8 @@ function toggleDone(id,val){const e=state.episodes.find(x=>x.id===id);if(!e)retu
 function deleteEpisode(id){pendingEpDeletes.add(id);state.episodes=state.episodes.filter(x=>x.id!==id);delete state.dayOverrides[id];save();}
 function bulkSetTask(ids,code){state.episodes.forEach(e=>{if(ids.has(e.id))e.taskCode=code;});save();}
 function bulkSetAssignee(ids,a){state.episodes.forEach(e=>{if(ids.has(e.id))e.assignee=a;});save();}
+function bulkSetDone(ids,v){state.episodes.forEach(e=>{if(!ids.has(e.id))return;e.done=v;if(v&&!e.dateLabeled)e.dateLabeled=todayISO();});save();}
+function bulkSetDateLabeled(ids,d){state.episodes.forEach(e=>{if(ids.has(e.id))e.dateLabeled=d;});save();}
 function bulkMoveBot(ids,bot){state.episodes.forEach(e=>{if(ids.has(e.id))e.bot=bot;});save();}
 function bulkMoveDate(ids,day){state.episodes.forEach(e=>{if(!ids.has(e.id))return;if(dateFromName(e.name)===day)delete state.dayOverrides[e.id];else state.dayOverrides[e.id]=day;});save();}
 function clearBotEpisodes(bot){state.episodes=state.episodes.filter(e=>e.bot!==bot);save();}
@@ -1594,8 +1596,10 @@ function bulkBar(bot,day){
   if(!isManager()||!selectedIds.size)return '';
   return `<div class="bulkbar">
     <span class="bb-n">${selectedIds.size} selected</span>
-    <select id="bbTask"><option value="">TASK CODE</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
-    <select id="bbAsg"><option value="">ASSIGNEE</option><option value="__CLEAR__">— (clear)</option>${allAnnotators().map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+    <select id="bbTask"><option value="" disabled selected hidden>TASK CODE</option><option value="__CLEAR__">— (clear)</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
+    <select id="bbAsg"><option value="" disabled selected hidden>ASSIGNEE</option><option value="__CLEAR__">— (clear)</option>${allAnnotators().map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+    <select id="bbDone"><option value="" disabled selected hidden>DONE</option><option value="1">Mark as done</option><option value="0">Mark as not done</option></select>
+    <input type="date" id="bbDate" title="Set date labeled on selected">
     ${isManager()?'<button class="btn btn-sm" id="bbBacklog">⇢ Send to backlog</button>':''}
     <button class="btn btn-sm" id="bbClear">✕ Clear</button>
   </div>`;
@@ -1643,11 +1647,17 @@ function wireDetail(bot,getDay,rerender){
   const dp=app.querySelector('.detail-panel');if(!dp)return;
   const at=dp.querySelector('#addToggle');if(at)at.addEventListener('click',()=>{addOpen=!addOpen;rerender();});
   const ag=dp.querySelector('#addGo');if(ag)ag.addEventListener('click',()=>{const ta=dp.querySelector('#addTa');if(!ta.value.trim()){toast('Paste episode names first');return;}const r=addEpisodes(bot,ta.value);addOpen=false;rerender();toast(`Added ${r.added}${r.skipped?` · ${r.skipped} duplicate skipped`:''}`);});
-  const bt=dp.querySelector('#bbTask');if(bt)bt.addEventListener('change',e=>{if(!e.target.value)return;bulkSetTask(selectedIds,e.target.value);rerender();toast('Task code set on '+selectedIds.size);});
+  const bt=dp.querySelector('#bbTask');if(bt)bt.addEventListener('change',e=>{const v=e.target.value;if(!v)return;bulkSetTask(selectedIds,(v==='__CLEAR__')?'':v);rerender();toast('Task code set on '+selectedIds.size);});
   const ba=dp.querySelector('#bbAsg');if(ba)ba.addEventListener('change',e=>{const v=e.target.value;if(!v)return;const val=(v==='__CLEAR__')?'':v;bulkSetAssignee(selectedIds,val);rerender();toast(val?('Assignee set on '+selectedIds.size):('Cleared assignee on '+selectedIds.size));});
   const bb=dp.querySelector('#bbBot');if(bb)bb.addEventListener('change',e=>{if(!e.target.value)return;const n=selectedIds.size;bulkMoveBot(selectedIds,e.target.value);const tgt=e.target.value;selectedIds.clear();rerender();toast('Moved '+n+' to '+tgt);});
   const bg=dp.querySelector('#bbDateGo');if(bg)bg.addEventListener('click',()=>{const v=dp.querySelector('#bbDate').value;if(!v){toast('Pick a date first');return;}const n=selectedIds.size;bulkMoveDate(selectedIds,v);selectedIds.clear();rerender();toast('Moved '+n+' to '+prettyShort(v));});
   const bbk=dp.querySelector('#bbBacklog');if(bbk)bbk.addEventListener('click',async()=>{const ids=[...selectedIds];if(!ids.length)return;for(const id of ids){const e=state.episodes.find(x=>x.id===id);if(e&&!e.done){e.assignee='';if(state.dayOverrides)delete state.dayOverrides[id];}if(CLOUD&&engineOk)try{await sbRpc('release_episode',{p_id:id});}catch(err){console.error(err);}}selectedIds.clear();save();scheduleCloudSync();rerender();toast(ids.length+' sent to backlog');});
+  const bd=dp.querySelector('#bbDone');
+  if(bd)bd.addEventListener('change',e=>{const v=e.target.value;if(v==='')return;const n=selectedIds.size;
+    bulkSetDone(selectedIds,v==='1');rerender();toast((v==='1'?'Marked done · ':'Marked not done · ')+n);});
+  const bdt=dp.querySelector('#bbDate');
+  if(bdt)bdt.addEventListener('change',e=>{const d=e.target.value;if(!d)return;const n=selectedIds.size;
+    bulkSetDateLabeled(selectedIds,d);rerender();toast('Date labeled set on '+n);});
   const bc=dp.querySelector('#bbClear');if(bc)bc.addEventListener('click',()=>{selectedIds.clear();rerender();});
   const sa=dp.querySelector('#selAll');if(sa)sa.addEventListener('change',e=>{const eps=dayEpisodes(bot,getDay());if(e.target.checked)eps.forEach(x=>selectedIds.add(x.id));else eps.forEach(x=>selectedIds.delete(x.id));rerender();});
   dp.addEventListener('change',e=>{
