@@ -1755,8 +1755,8 @@ let qcSel={bot:null,day:null};let qcBotFilter='';
 const qcCollapsed=new Set(), qcOpenMonths=new Set(), qcExpanded=new Set();
 
 function qcEpisodesFor(bot){return episodesFor(bot).filter(e=>e.done);}   /* completed only */
-function qcDaysOf(bot){return [...new Set(qcEpisodesFor(bot).map(dayOf))].sort((a,b)=>a<b?1:-1);}
-function qcMonthsOf(bot){return [...new Set(qcDaysOf(bot).map(d=>d==='Undated'?'Undated':d.slice(0,7)))].sort((a,b)=>a<b?1:-1);}
+function qcDaysOf(bot){return [...new Set(qcEpisodesFor(bot).map(dayOf))].sort();}   /* oldest → latest */
+function qcMonthsOf(bot){return [...new Set(qcDaysOf(bot).map(d=>d==='Undated'?'Undated':d.slice(0,7)))].sort();}
 function qcDaysInMonth(bot,m){return qcDaysOf(bot).filter(d=>(d==='Undated'?'Undated':d.slice(0,7))===m);}
 function qcDayEpisodes(bot,day){return qcEpisodesFor(bot).filter(e=>dayOf(e)===day).sort((a,b)=>a.name<b.name?-1:1);}
 
