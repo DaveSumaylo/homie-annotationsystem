@@ -370,6 +370,9 @@
   .grow.sel{background:rgba(52,211,153,.06);box-shadow:inset 2px 0 0 var(--acc)}
   .bulkbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px;background:var(--acc-soft);border-bottom:1px solid var(--acc-line)}
   .bulkbar select{width:auto;padding:5px 8px;font-size:12px;font-weight:600}
+  .bulkbar input[type="date"]{width:auto;padding:5px 8px;font-size:12px;font-weight:600;height:auto;line-height:normal;
+    background:var(--surface-3);color:var(--ink);border:1px solid var(--border);border-radius:8px;font-family:inherit}
+  .bulkbar .btn-danger{background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.45)}
   .bb-n{font-size:12px;font-weight:800;color:var(--acc);margin-right:4px}
   .bb-date{display:flex;align-items:center;gap:5px}
   .bb-date input{width:auto;padding:5px 7px;font-size:12px}
@@ -1601,6 +1604,7 @@ function bulkBar(bot,day){
     <select id="bbDone"><option value="" disabled selected hidden>DONE</option><option value="1">Mark as done</option><option value="0">Mark as not done</option></select>
     <input type="date" id="bbDate" title="Set date labeled on selected">
     ${isManager()?'<button class="btn btn-sm" id="bbBacklog">⇢ Send to backlog</button>':''}
+    ${isManager()?'<button class="btn btn-sm btn-danger" id="bbDel">🗑 Delete</button>':''}
     <button class="btn btn-sm" id="bbClear">✕ Clear</button>
   </div>`;
 }
@@ -1658,6 +1662,17 @@ function wireDetail(bot,getDay,rerender){
   const bdt=dp.querySelector('#bbDate');
   if(bdt)bdt.addEventListener('change',e=>{const d=e.target.value;if(!d)return;const n=selectedIds.size;
     bulkSetDateLabeled(selectedIds,d);rerender();toast('Date labeled set on '+n);});
+  const bdel=dp.querySelector('#bbDel');
+  if(bdel)bdel.addEventListener('click',()=>{
+    const ids=[...selectedIds];if(!ids.length)return;
+    const doneN=ids.filter(id=>{const e=state.episodes.find(x=>x.id===id);return e&&e.done;}).length;
+    const msg='Delete '+ids.length+' episode'+(ids.length===1?'':'s')+'?'
+      +(doneN?('\n\n'+doneN+' of them are already DONE — their completed work will be lost.'):'')
+      +'\n\nThis cannot be undone.';
+    if(!confirm(msg))return;
+    ids.forEach(id=>deleteEpisode(id));
+    selectedIds.clear();rerender();toast('Deleted '+ids.length+' episode'+(ids.length===1?'':'s'));
+  });
   const bc=dp.querySelector('#bbClear');if(bc)bc.addEventListener('click',()=>{selectedIds.clear();rerender();});
   const sa=dp.querySelector('#selAll');if(sa)sa.addEventListener('change',e=>{const eps=dayEpisodes(bot,getDay());if(e.target.checked)eps.forEach(x=>selectedIds.add(x.id));else eps.forEach(x=>selectedIds.delete(x.id));rerender();});
   dp.addEventListener('change',e=>{
