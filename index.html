@@ -718,13 +718,19 @@ function fulltimeNames(){
 function isFreelancerName(name){return nameRole(name)==='freelancer';}
 function isManager(){return me.role==='manager';}
 function isFreelancer(){return me.role==='freelancer';}
+function isQC(){return me.role==='qc';}
 function isWorker(){return me.role==='fulltime'||me.role==='freelancer'||me.role==='annotator';}
 function applyRole(){
   const tm=document.getElementById('tabManager');if(tm)tm.style.display=isManager()?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
-  const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=isManager()?'':'none';
-  if(!isManager()&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
+  if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(isQC()){                                   /* QC sees only the QC tab */
+    ['tabEpisodes','tabDashboard','tabTimelog','tabBacklog','tabManager','btnSettings'].forEach(function(id){
+      const el=document.getElementById(id);if(el)el.style.display='none';});
+    if(mode!=='qc'){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
+  }
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
   const tdash=document.getElementById('tabDashboard');if(tdash)tdash.style.display=isFreelancer()?'none':'';
@@ -918,7 +924,7 @@ function engineFail(e){const m=String((e&&e.message)||'');
   if(m.indexOf('404')>=0||m.toLowerCase().indexOf('function')>=0){if(engineOk){engineOk=false;toast('ASSIGNMENT ENGINE OFF — run the Phase 1 SQL');}}
   else console.error('engine',e);}
 async function engineFillQueue(opts){
-  if(!CLOUD||!session||!engineOk||isManager())return;
+  if(!CLOUD||!session||!engineOk||isManager()||isQC())return;   /* QC accounts never receive episodes */
   const who=myAnnotatorName();if(!who)return;
   if(!isFreelancer()&&!isOnClock(who))return;   /* full-timer must clock in before any assignment */
   /* freelancer must explicitly request work — never auto-assigned on load/poll */
@@ -1468,7 +1474,7 @@ function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
 function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
 function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
 function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
-function render(){ if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else renderAnnotator(); }
+function render(){ if(isQC())mode='qc'; if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
