@@ -265,6 +265,19 @@
   .btn-req{background:var(--acc);color:#04231a;border:none;font-weight:800;font-size:12px;letter-spacing:.3px;padding:9px 16px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
   .btn-req:disabled{background:var(--surface-3);color:var(--ink-faint);cursor:not-allowed}
   .req-hint{font-size:11px;color:var(--ink-faint)}
+  .qc-cols{grid-template-columns:2.2fr .8fr 1fr .9fr 1fr 1.2fr .6fr .9fr}
+  .qc-row-wrap{border-bottom:1px solid var(--border)}
+  .qc-exp{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:11px;padding:0 4px}
+  .qc-badge{margin-left:6px;font-size:9px;font-weight:800;background:rgba(180,83,9,.2);color:var(--amber);border:1px solid rgba(180,83,9,.45);border-radius:20px;padding:1px 6px}
+  .qc-detail{padding:8px 14px 12px 30px;background:var(--surface-2)}
+  .qc-mcap{border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:8px;background:var(--surface)}
+  .qc-mcap-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11px}
+  .qc-codes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+  .qc-code{font-size:10.5px;font-weight:700;background:var(--surface-3);border:1px solid var(--border);border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:5px}
+  .qc-code button{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:12px;line-height:1}
+  .qc-addcode select,.qc-addmcap input,.qc-addmcap select{font-size:11px}
+  .qc-addmcap{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .qc-addmcap input{width:90px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface-3);color:var(--ink)}
   .bc-alldone{color:var(--acc);font-size:11px;font-weight:700;text-align:center;padding:10px 0}
   .row1 .bc-new{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:6px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45)}
   select.asg,select.g-asg{text-align:center;text-align-last:center}
@@ -468,6 +481,7 @@
       <button data-mode="dashboard" id="tabDashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
       <button data-mode="manager" id="tabManager" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Manager</button>
       <button data-mode="annotator" id="tabEpisodes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Episodes</button>
+      <button id="tabQc" data-mode="qc" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>QC</button>
       <button id="tabBacklog" data-mode="backlog" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>Backlog</button>
       <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
@@ -540,7 +554,7 @@ if(!Array.isArray(state.timeEntries))state.timeEntries=[];
 if(typeof state.batchSize!=='number')state.batchSize=5;
 if(typeof state.listsVersion!=='number')state.listsVersion=0;
 if(typeof state.queueSize!=='number')state.queueSize=10;
-let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog'].includes(m)?m:'dashboard';})();
+let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog','qc'].includes(m)?m:'dashboard';})();
 let openBot=null;
 const drawerOpen=new Set();       // manager drawer date groups that are EXPANDED (default collapsed)
 const drawerMonthOpen=new Set();  // manager drawer month groups EXPANDED (default collapsed)
@@ -670,6 +684,8 @@ function applyRole(){
   const tm=document.getElementById('tabManager');if(tm)tm.style.display=isManager()?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
+  const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=isManager()?'':'none';
+  if(!isManager()&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
   const tdash=document.getElementById('tabDashboard');if(tdash)tdash.style.display=isFreelancer()?'none':'';
@@ -687,9 +703,9 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
   if(r.status===401&&session){try{await authRefresh();const o2=Object.assign({},opts);o2.headers=Object.assign({},opts&&opts.headers,{'Authorization':'Bearer '+session.access_token});r=await fetch(sbBase()+path,o2);}catch(e){}}
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Supabase '+r.status+' '+t.slice(0,160));}return r;}
 
-function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done};}
-function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),createdAt:Date.now()};}
-function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0);}
+function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done,qc_name:e.qcName||null,qc_date:e.qcDate||null,qc_checked:!!e.qcChecked,qc_comment:e.qcComment||null,qc_errors:e.qcErrors||[]};}
+function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),qcName:r.qc_name||'',qcDate:r.qc_date||'',qcChecked:!!r.qc_checked,qcComment:r.qc_comment||'',qcErrors:Array.isArray(r.qc_errors)?r.qc_errors:[],createdAt:Date.now()};}
+function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0)+'|'+(e.qcName||'')+'|'+(e.qcDate||'')+'|'+(e.qcChecked?1:0)+'|'+(e.qcComment||'')+'|'+JSON.stringify(e.qcErrors||[]);}
 function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
@@ -1401,7 +1417,7 @@ function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
 function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
 function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
 function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
-function render(){ if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else renderAnnotator(); }
+function render(){ if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
@@ -1669,6 +1685,114 @@ function renderBacklog(){
   app.querySelectorAll('[data-blday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.blday.split('|');bsel={bot:b,day:d,epId:null};selectedIds.clear();renderBacklog();}));
   app.querySelectorAll('[data-q]').forEach(el=>el.addEventListener('click',()=>{bsel={bot:null,day:null,epId:el.dataset.q};selectedIds.clear();renderBacklog();}));
   wireDetail(bsel.bot,()=>bsel.day,renderBacklog);
+}
+
+/* ---------- QC module ---------- */
+const QC_CODES=[['101','Unlabeled Actions'],['102','Missing Main Task / Fail Task'],['103','Missing Subtask'],
+ ['104','Missing "end"'],['105','Missing Moving Action (Start of main task)'],['106','Missing Moving Action (Between subtask)'],
+ ['201','Wrong keyword used'],['202','Outdated Keywords'],['301','Human Intervention'],['302','Frozen Image / Fail'],
+ ['303','Mislabeled (Labeled wrongly)'],['401','Timestamp/Gap Adjustment Needed']];
+let qcSel={bot:null,day:null};
+const qcCollapsed=new Set(), qcOpenMonths=new Set(), qcExpanded=new Set();
+
+function qcEpisodesFor(bot){return episodesFor(bot).filter(e=>e.done);}   /* completed only */
+function qcDaysOf(bot){return [...new Set(qcEpisodesFor(bot).map(dayOf))].sort((a,b)=>a<b?1:-1);}
+function qcMonthsOf(bot){return [...new Set(qcDaysOf(bot).map(d=>d==='Undated'?'Undated':d.slice(0,7)))].sort((a,b)=>a<b?1:-1);}
+function qcDaysInMonth(bot,m){return qcDaysOf(bot).filter(d=>(d==='Undated'?'Undated':d.slice(0,7))===m);}
+function qcDayEpisodes(bot,day){return qcEpisodesFor(bot).filter(e=>dayOf(e)===day).sort((a,b)=>a.name<b.name?-1:1);}
+
+function qcTreeBot(bot){
+  const eps=qcEpisodesFor(bot); if(!eps.length)return '';
+  const bo=!qcCollapsed.has(bot); const months=qcMonthsOf(bot);
+  const pend=eps.filter(e=>!e.qcChecked).length;
+  return `<div class="trow tbot" data-qcbot="${esc(bot)}">
+      <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
+      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span>${pend>0?`<span class="tnew" style="background:rgba(180,83,9,.2);color:var(--amber);border-color:rgba(180,83,9,.45)">${pend}</span>`:''}<span class="tcount">${eps.length}</span></div>
+    ${bo?months.map(m=>{const mo=qcOpenMonths.has(bot+'|'+m);const days=qcDaysInMonth(bot,m);
+      let t=0,c=0;days.forEach(d=>{const de=qcDayEpisodes(bot,d);t+=de.length;c+=de.filter(e=>e.qcChecked).length;});
+      return `<div class="trow tmonth" data-qcmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span><span class="tclip ${c<t?'warn':''}">${c}/${t}</span></div>
+        ${mo?days.map(d=>{const active=qcSel.bot===bot&&qcSel.day===d;const de=qcDayEpisodes(bot,d);const cd=de.filter(e=>e.qcChecked).length;
+          return `<div class="trow tday ${active?'active':''}" data-qcday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span><span class="tclip ${cd<de.length?'warn':''}">${cd}/${de.length}</span></div>`;}).join(''):''}`;}).join(''):''}`;
+}
+
+function qcErrBlock(e){
+  const list=Array.isArray(e.qcErrors)?e.qcErrors:[];
+  const rows=list.map((m,i)=>`<div class="qc-mcap">
+      <div class="qc-mcap-head"><b>MCap ${esc(String(m.mcap))}</b>
+        <button class="btn btn-sm" data-qcdelmcap="${e.id}|${i}">Remove</button></div>
+      <div class="qc-codes">${(m.codes||[]).map((c,ci)=>`<span class="qc-code">${esc(c)} <button data-qcdelcode="${e.id}|${i}|${ci}">&times;</button></span>`).join('')||'<span class="hint">No codes</span>'}</div>
+      <div class="qc-addcode"><select data-qccodesel="${e.id}|${i}"><option value="">Add error code…</option>${QC_CODES.map(([c,l])=>`<option value="${c}">${c} — ${esc(l)}</option>`).join('')}</select></div>
+    </div>`).join('');
+  return `<div class="qc-errors">${rows||'<div class="hint" style="padding:4px 0">No MCaps added</div>'}
+    <div class="qc-addmcap"><input type="number" min="1" placeholder="MCap #" data-qcmcapnum="${e.id}"><button class="btn btn-sm" data-qcaddmcap="${e.id}">+ Add MCap</button></div></div>`;
+}
+
+function qcDetail(bot,day){
+  if(!bot||!day)return `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><h3>No date selected</h3><p>Pick a bot and date on the left to QC its completed episodes.</p></div>`;
+  const eps=qcDayEpisodes(bot,day);
+  if(!eps.length)return `<div class="empty-state"><h3>Nothing to QC</h3><p>No completed episodes on this date.</p></div>`;
+  const done=eps.filter(e=>e.qcChecked).length;
+  return `<div class="detail-head"><span class="dh-emoji">${botIcon(bot)}</span>
+      <div><div class="dh-title">${esc(bot)}</div><div class="dh-sub">${prettyDate(day)} · QC</div></div>
+      <div class="dh-prog"><span class="dh-frac">${done}/${eps.length} checked</span></div></div>
+    <div class="gscroll"><div class="ginner qc-grid">
+      <div class="gcols qc-cols"><div>Episode</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>QC name</div><div>Check date</div><div>Checked</div><div>Comment</div></div>
+      ${eps.map(e=>{const open=qcExpanded.has(e.id);const nerr=(e.qcErrors||[]).reduce((s,m)=>s+((m.codes||[]).length),0);
+        return `<div class="qc-row-wrap">
+        <div class="grow qc-cols">
+          <div class="ep-ro"><button class="qc-exp" data-qcexp="${e.id}">${open?'▾':'▸'}</button> ${esc(e.name)}${nerr?`<span class="qc-badge">${nerr}</span>`:''}</div>
+          <div class="ep-ro">${esc(e.taskCode||'—')}</div>
+          <div class="ep-ro">${esc(e.assignee||'—')}</div>
+          <div class="ep-ro">${esc(e.dateLabeled||'—')}</div>
+          <div class="ep-ro">${esc(e.qcName||'—')}</div>
+          <div class="ep-ro">${e.qcDate?esc(new Date(e.qcDate).toLocaleString()):'—'}</div>
+          <div><input type="checkbox" class="g-check" data-qcchk="${e.id}" ${e.qcChecked?'checked':''}></div>
+          <div><select class="g-asg" data-qccom="${e.id}"><option value="">—</option>${['OK','Relabel','Amended'].map(o=>`<option ${e.qcComment===o?'selected':''}>${o}</option>`).join('')}</select></div>
+        </div>
+        ${open?`<div class="qc-detail">${qcErrBlock(e)}</div>`:''}
+      </div>`;}).join('')}
+    </div></div>`;
+}
+
+function qcSave(){save();scheduleCloudSync();}
+function qcStamp(e){const who=(me&&me.name)||'';if(e.qcChecked){e.qcName=who;e.qcDate=new Date().toISOString();}else{e.qcName='';e.qcDate='';}}
+
+function renderQC(){
+  keepTreeScroll('qc');
+  const any=state.bots.some(b=>qcEpisodesFor(b).length>0);
+  app.innerHTML=`
+    <div class="tree-layout">
+      <div class="tree-panel">
+        <div class="tree-filter" style="pointer-events:none;opacity:.9"><select disabled><option>QC · completed episodes</option></select></div>
+        ${any?state.bots.map(qcTreeBot).join(''):'<div class="empty-state" style="padding:24px 10px"><h3>Nothing completed yet</h3></div>'}
+      </div>
+      <div class="detail-panel">${qcDetail(qcSel.bot,qcSel.day)}</div>
+    </div>`;
+  restoreTreeScroll('qc');
+  app.querySelectorAll('[data-qcbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.qcbot;qcCollapsed.has(b)?qcCollapsed.delete(b):qcCollapsed.add(b);renderQC();}));
+  app.querySelectorAll('[data-qcmonth]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.qcmonth;qcOpenMonths.has(k)?qcOpenMonths.delete(k):qcOpenMonths.add(k);renderQC();}));
+  app.querySelectorAll('[data-qcday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.qcday.split('|');qcSel={bot:b,day:d};renderQC();}));
+  app.querySelectorAll('[data-qcexp]').forEach(el=>el.addEventListener('click',()=>{const id=el.dataset.qcexp;qcExpanded.has(id)?qcExpanded.delete(id):qcExpanded.add(id);renderQC();}));
+  app.querySelectorAll('[data-qcchk]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qcchk);if(!e)return;e.qcChecked=ev.target.checked;qcStamp(e);qcSave();renderQC();}));
+  app.querySelectorAll('[data-qccom]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qccom);if(!e)return;e.qcComment=ev.target.value;qcSave();}));
+  app.querySelectorAll('[data-qcaddmcap]').forEach(el=>el.addEventListener('click',()=>{
+    const id=el.dataset.qcaddmcap;const e=state.episodes.find(x=>x.id===id);if(!e)return;
+    const inp=app.querySelector(`[data-qcmcapnum="${id}"]`);const n=parseInt(inp&&inp.value,10);
+    if(!n||n<1){toast('Enter an MCap number');return;}
+    e.qcErrors=Array.isArray(e.qcErrors)?e.qcErrors:[];
+    if(e.qcErrors.some(m=>String(m.mcap)===String(n))){toast('MCap '+n+' already added');return;}
+    e.qcErrors.push({mcap:n,codes:[]});e.qcErrors.sort((a,b)=>a.mcap-b.mcap);qcSave();renderQC();}));
+  app.querySelectorAll('[data-qcdelmcap]').forEach(el=>el.addEventListener('click',()=>{
+    const [id,i]=el.dataset.qcdelmcap.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
+    e.qcErrors.splice(+i,1);qcSave();renderQC();}));
+  app.querySelectorAll('[data-qccodesel]').forEach(el=>el.addEventListener('change',ev=>{
+    const [id,i]=el.dataset.qccodesel.split('|');const v=ev.target.value;if(!v)return;
+    const e=state.episodes.find(x=>x.id===id);if(!e)return;const m=e.qcErrors[+i];if(!m)return;
+    m.codes=m.codes||[];if(m.codes.includes(v)){toast('Code already added');return;}
+    m.codes.push(v);m.codes.sort();qcSave();renderQC();}));
+  app.querySelectorAll('[data-qcdelcode]').forEach(el=>el.addEventListener('click',()=>{
+    const [id,i,ci]=el.dataset.qcdelcode.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
+    e.qcErrors[+i].codes.splice(+ci,1);qcSave();renderQC();}));
 }
 
 /* ---------- Annotator ---------- */
