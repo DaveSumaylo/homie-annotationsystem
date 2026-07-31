@@ -622,12 +622,21 @@ function botOpen(b){return !collapsedBots.has(b);}
 function monthOpen(b,m){return openMonths.has(b+'|'+m);}
 
 function assigneeSelect(id,current){const c=current?annoColor(current):null;const style=c?`background:${c.bg};color:${c.fg};border-color:${c.bd}`:'';
-  return `<select class="asg ${current?'':'blank'}" data-asg="${id}" style="${style}"><option value="">Unassigned</option>${state.annotators.map(a=>`<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
+  return `<select class="asg ${current?'':'blank'}" data-asg="${id}" style="${style}"><option value="">Unassigned</option>${allAnnotators().map(a=>`<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
 function assigneeSelectDate(bot,date,common){const c=common?annoColor(common):null;const style=c?`background:${c.bg};color:${c.fg};border-color:${c.bd}`:'';
-  return `<select class="asg ${common?'':'blank'}" data-asgdate="${esc(bot)}|${esc(date)}" style="${style}"><option value="">— Assign all —</option>${state.annotators.map(a=>`<option value="${esc(a)}" ${a===common?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
+  return `<select class="asg ${common?'':'blank'}" data-asgdate="${esc(bot)}|${esc(date)}" style="${style}"><option value="">— Assign all —</option>${allAnnotators().map(a=>`<option value="${esc(a)}" ${a===common?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
+function taskOpts(current){
+  const list=state.taskCodes.slice();
+  if(current&&!list.includes(current))list.push(current);
+  return list.map(t=>`<option value="${esc(t)}" ${t===current?'selected':''}>${esc(t)}</option>`).join('');
+}
+function assigneeOptions(current){
+  const list=allAnnotators();
+  if(current&&!list.includes(current))list.push(current);
+  return list;
+}
 function gridAsg(id,current){const c=current?annoColor(current):null;const style=c?`background:${c.bg};color:${c.fg};border-color:${c.bd}`:'';
-  const names=state.annotators.slice();
-  if(current&&!names.some(a=>a===current))names.push(current);   /* keep assignees not in the settings list (e.g. freelancers) visible */
+  const names=assigneeOptions(current);
   return `<select class="g-asg ${current?'':'blank'}" data-asg="${id}" style="${style}"><option value="">—</option>${names.map(a=>`<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}</select>`;}
 
 /* ---------- Supabase cloud sync ---------- */
@@ -691,6 +700,17 @@ function nameRole(name){
   return '';   // unknown -> treated as non-fulltime (safe: won't be counted as D.A)
 }
 function isFulltimeName(name){return nameRole(name)==='fulltime';}
+/* Roster-first name list. Supabase profiles are authoritative; the Settings
+   list only ADDS extras. Never let a truncated Settings list hide a worker. */
+function rosterNames(){return Object.keys(roleMap||{}).filter(n=>{const r=roleMap[n];return r==='fulltime'||r==='freelancer';});}
+function allAnnotators(){
+  const out=[],seen=new Set();
+  rosterNames().concat(state.annotators||[]).forEach(n=>{const k=(n||'').trim();if(!k)return;
+    const lk=k.toLowerCase();if(seen.has(lk))return;seen.add(lk);out.push(k);});
+  return out;
+}
+function isKnownWorker(n){const k=(n||'').trim().toLowerCase();if(!k)return false;
+  return allAnnotators().some(a=>a.toLowerCase()===k);}
 function fulltimeNames(){
   const fromMap=Object.keys(roleMap).filter(n=>roleMap[n]==='fulltime');
   return fromMap.length?fromMap:FULLTIME_FALLBACK.slice();   // fallback until roster loads
@@ -752,7 +772,17 @@ async function cloudLoad(){
 }
 async function cloudChunkUpsert(rows){for(let i=0;i<rows.length;i+=500){const chunk=rows.slice(i,i+500);await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 async function cloudChunkDelete(ids){for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('episodes?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}}
-async function cloudPushMeta(){await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0}}])});}
+function looksLikeSeedLists(){
+  /* the app fell back to defaults (e.g. localStorage was cleared/quota-hit):
+     don't let that overwrite the shared lists */
+  const a=state.annotators||[],t=state.taskCodes||[];
+  const sameA=a.length===SEED.annotators.length&&a.every((x,i)=>x===SEED.annotators[i]);
+  const sameT=t.length===SEED.taskCodes.length&&t.every((x,i)=>x===SEED.taskCodes[i]);
+  return sameA&&sameT&&!state.listsVersion;
+}
+async function cloudPushMeta(){
+  if(looksLikeSeedLists()){console.warn('skipping meta push: lists look like untouched defaults');return;}
+  await sbFetch('app_meta?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:1,data:{bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0}}])});}
 
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
@@ -876,7 +906,9 @@ async function cloudPoll(){
 /* ---------- Phase 1: Assignment Engine (client bridge; logic lives in Postgres RPC) ---------- */
 let engineOk=true;
 async function sbRpc(fn,args){const r=await sbFetch('rpc/'+fn,{method:'POST',headers:sbHeaders(),body:JSON.stringify(args||{})});return await r.json();}
-function myAnnotatorName(){const n=((me&&me.name)||'').trim();if(!n)return null;const hit=state.annotators.find(a=>a.toLowerCase()===n.toLowerCase());return hit||null;}
+function myAnnotatorName(){const n=((me&&me.name)||'').trim();if(!n)return null;
+  const hit=allAnnotators().find(a=>a.toLowerCase()===n.toLowerCase());
+  return hit||n;   /* fall back to the profile name itself — never return null for a real user */}
 function mergeEngineRows(rows){if(!Array.isArray(rows)||!rows.length)return false;const idx=new Map(state.episodes.map(e=>[e.id,e]));let ch=false;
   for(const r of rows){const inc=rowToEp(r);const cur=idx.get(inc.id);
     if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);}else{Object.assign(cur,inc);}
@@ -900,7 +932,7 @@ function hasOpenWork(who){return state.episodes.some(e=>e.assignee===who&&!e.don
 async function engineOnComplete(epId){
   if(!CLOUD||!session||!engineOk)return;
   const e=state.episodes.find(x=>x.id===epId);
-  if(!e||!e.assignee||!state.annotators.includes(e.assignee))return;
+  if(!e||!e.assignee||!isKnownWorker(e.assignee))return;   /* roster-aware: truncated Settings list must never block a refill */
   if(!isManager()&&!isFreelancer()&&!isOnClock(myAnnotatorName()))return;   /* full-timer must be clocked in to get a refill */
   const batch=isFreelancer()?(state.freelancerQueueSize||6):(state.batchSize||5);
   try{const rows=await sbRpc('complete_episode',{p_id:epId,p_batch:batch});
@@ -1347,12 +1379,12 @@ function renderTimeLog(){
   const people=[...new Set(all.map(t=>t.person))].sort();
   const filtered=(tlFilter&&!mineOnly?all.filter(t=>t.person===tlFilter):all).sort((a,b)=>((b.day+(b.start||''))<(a.day+(a.start||''))?-1:1));
   const list=tlShowAll?filtered:filtered.slice(0,TLLIM);
-  const annOpts=t=>`<option value=\"\" ${!t.person?'selected':''}>—</option>`+state.annotators.map(a=>`<option ${a===t.person?'selected':''}>${esc(a)}</option>`).join('')+(state.annotators.includes(t.person)||!t.person?'':`<option selected>${esc(t.person)}</option>`);
+  const annOpts=t=>`<option value=\"\" ${!t.person?'selected':''}>—</option>`+allAnnotators().map(a=>`<option ${a===t.person?'selected':''}>${esc(a)}</option>`).join('')+(state.annotators.includes(t.person)||!t.person?'':`<option selected>${esc(t.person)}</option>`);
   app.innerHTML=`
    ${isFreelancer()?'':`<div class="tl-clock">
      <div class="ck-group">
        <button class="btn btn-primary" id="btnCkIn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>Clock in</button>
-       <select id="ckInWho" class="ck-sel" style="display:none"><option value="">Who's clocking in?</option>${state.annotators.filter(a=>!isOnClock(a)).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+       <select id="ckInWho" class="ck-sel" style="display:none"><option value="">Who's clocking in?</option>${allAnnotators().filter(a=>!isOnClock(a)&&nameRole(a)!=='freelancer').map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
      </div>
      <div class="ck-group">
        <button class="btn" id="btnCkOut" ${openShifts().length?'':'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Clock out${openShifts().length?' ('+openShifts().length+')':''}</button>
@@ -1555,7 +1587,7 @@ function bulkBar(bot,day){
   return `<div class="bulkbar">
     <span class="bb-n">${selectedIds.size} selected</span>
     <select id="bbTask"><option value="">TASK CODE</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
-    <select id="bbAsg"><option value="">ASSIGNEE</option><option value="__CLEAR__">— (clear)</option>${state.annotators.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+    <select id="bbAsg"><option value="">ASSIGNEE</option><option value="__CLEAR__">— (clear)</option>${allAnnotators().map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
     ${isManager()?'<button class="btn btn-sm" id="bbBacklog">⇢ Send to backlog</button>':''}
     <button class="btn btn-sm" id="bbClear">✕ Clear</button>
   </div>`;
@@ -1591,7 +1623,7 @@ function gridRow(e){
   return `<div class="grow ${e.done?'done':''} ${mgr&&selectedIds.has(e.id)?'sel':''}" data-eid="${e.id}">
     <div>${mgr?`<input type="checkbox" class="g-check" data-sel="${e.id}" ${selectedIds.has(e.id)?'checked':''}>`:''}</div>
     <div>${mgr?`<input type="text" class="g-name" data-name="${e.id}" value="${esc(e.name)}">`:`<span class="ep-ro">${esc(e.name)}</span>`}</div>
-    <div><select class="g-task" data-task="${e.id}"><option value="">—</option>${state.taskCodes.map(t=>`<option value="${esc(t)}" ${t===e.taskCode?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+    <div><select class="g-task" data-task="${e.id}"><option value="">—</option>${taskOpts(e.taskCode)}</select></div>
     <div>${mgr?gridAsg(e.id,e.assignee):asgReadOnly(e.assignee)}</div>
     <div><input type="date" class="g-date" data-date="${e.id}" value="${e.dateLabeled||''}"></div>
     <div><input type="checkbox" class="g-check" data-done="${e.id}" ${e.done?'checked':''}></div>
