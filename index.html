@@ -372,6 +372,7 @@
   .bulkbar select{width:auto;padding:5px 8px;font-size:12px;font-weight:600}
   .bulkbar input[type="date"]{width:auto;padding:5px 8px;font-size:12px;font-weight:600;height:auto;line-height:normal;
     background:var(--surface-3);color:var(--ink);border:1px solid var(--border);border-radius:8px;font-family:inherit}
+  .bulkbar .bb-date{display:inline-flex;align-items:center;gap:4px}
   .bulkbar .btn-danger{background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.45)}
   .bb-n{font-size:12px;font-weight:800;color:var(--acc);margin-right:4px}
   .bb-date{display:flex;align-items:center;gap:5px}
@@ -1601,8 +1602,8 @@ function bulkBar(bot,day){
     <span class="bb-n">${selectedIds.size} selected</span>
     <select id="bbTask"><option value="" disabled selected hidden>TASK CODE</option><option value="__CLEAR__">— (clear)</option>${state.taskCodes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
     <select id="bbAsg"><option value="" disabled selected hidden>ASSIGNEE</option><option value="__CLEAR__">— (clear)</option>${allAnnotators().map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+    <span class="bb-date"><input type="date" id="bbDate" title="Set date labeled on selected"><button class="btn btn-sm" id="bbDateClr" title="Clear date labeled on selected">✕</button></span>
     <select id="bbDone"><option value="" disabled selected hidden>DONE</option><option value="1">Mark as done</option><option value="0">Mark as not done</option></select>
-    <input type="date" id="bbDate" title="Set date labeled on selected">
     ${isManager()?'<button class="btn btn-sm" id="bbBacklog">⇢ Send to backlog</button>':''}
     ${isManager()?'<button class="btn btn-sm btn-danger" id="bbDel">🗑 Delete</button>':''}
     <button class="btn btn-sm" id="bbClear">✕ Clear</button>
@@ -1662,6 +1663,11 @@ function wireDetail(bot,getDay,rerender){
   const bdt=dp.querySelector('#bbDate');
   if(bdt)bdt.addEventListener('change',e=>{const d=e.target.value;if(!d)return;const n=selectedIds.size;
     bulkSetDateLabeled(selectedIds,d);rerender();toast('Date labeled set on '+n);});
+  const bdc=dp.querySelector('#bbDateClr');
+  if(bdc)bdc.addEventListener('click',()=>{const n=selectedIds.size;if(!n)return;
+    bulkSetDateLabeled(selectedIds,'');
+    const dp2=dp.querySelector('#bbDate');if(dp2)dp2.value='';
+    rerender();toast('Date cleared on '+n);});
   const bdel=dp.querySelector('#bbDel');
   if(bdel)bdel.addEventListener('click',()=>{
     const ids=[...selectedIds];if(!ids.length)return;
