@@ -578,7 +578,18 @@ const treeScroll={anno:0,mgr:0};                 // tree bot filter ('' = all)
 
 function load(){try{const raw=localStorage.getItem(KEY);if(!raw)return structuredClone(SEED);return Object.assign(structuredClone(SEED),JSON.parse(raw));}catch(e){return structuredClone(SEED);}}
 let _saveTimer=null;
-function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){console.error('persist failed',e);}}
+function persistLocal(){
+  try{localStorage.setItem(KEY,JSON.stringify(state));return;}catch(e){/* quota — fall through */}
+  /* Too big for localStorage (large episode sets). Episodes always reload from
+     Supabase on boot, so cache everything EXCEPT episodes rather than failing. */
+  try{
+    const slim=Object.assign({},state,{episodes:[]});
+    localStorage.setItem(KEY,JSON.stringify(slim));
+  }catch(e2){
+    try{localStorage.removeItem(KEY);}catch(e3){}
+    console.error('persist failed (quota)',e2);
+  }
+}
 function save(){scheduleCloudSync();clearTimeout(_saveTimer);_saveTimer=setTimeout(()=>{_saveTimer=null;persistLocal();},450);}
 window.addEventListener('beforeunload',persistLocal);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){persistLocal();if(CLOUD&&session){clearTimeout(syncTimer);cloudFlush();}}});
@@ -735,7 +746,7 @@ async function cloudLoad(){
   }catch(e){console.error('time entries load',e);}
   syncedEps=new Map(state.episodes.map(e=>[e.id,epSig(e)]));
   syncedMeta=metaSig();
-  localStorage.setItem(KEY,JSON.stringify(state));
+  persistLocal();
 }
 async function cloudChunkUpsert(rows){for(let i=0;i<rows.length;i+=500){const chunk=rows.slice(i,i+500);await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 async function cloudChunkDelete(ids){for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('episodes?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}}
