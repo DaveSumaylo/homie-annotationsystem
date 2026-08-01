@@ -339,7 +339,7 @@
   .kmv{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums}
   .kmetric .kbar{height:5px}
   /* reference-style dashboard */
-  .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+  .trio{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
   @media(max-width:1000px){.trio{grid-template-columns:1fr}}
   .pp{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
   .pt2{font-size:11px;font-weight:700;color:var(--acc);letter-spacing:.7px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
@@ -372,6 +372,26 @@
   .bulkbar select{width:auto;padding:5px 8px;font-size:12px;font-weight:600}
   .bulkbar input[type="date"]{width:auto;padding:5px 8px;font-size:12px;font-weight:600;height:auto;line-height:normal;
     background:var(--surface-3);color:var(--ink);border:1px solid var(--border);border-radius:8px;font-family:inherit}
+  .an-table{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto;margin-top:10px}
+  .an-head,.an-row{display:grid;align-items:center;gap:0;min-width:820px}
+  .an-ft{grid-template-columns:1.5fr repeat(12,.62fr)}
+  .an-fl{grid-template-columns:1.6fr repeat(4,1fr)}
+  .an-head{background:var(--surface-2);border-bottom:2px solid var(--border);font-size:9.5px;font-weight:800;letter-spacing:.3px;color:var(--ink-faint)}
+  .an-head>div,.an-row>div{padding:8px 9px;text-align:center;font-variant-numeric:tabular-nums;font-size:11.5px;
+    border-right:1px solid var(--border)}
+  .an-head>div:last-child,.an-row>div:last-child{border-right:none}
+  .an-head>div:first-child,.an-row>div:first-child{text-align:left}
+  .an-row{border-bottom:1px solid var(--border)}
+  .an-row:last-child{border-bottom:none}
+  .an-row:hover{background:var(--surface-2)}
+  .an-name{font-weight:700;text-transform:none}
+  /* colour by metric type */
+  .an-eps{color:var(--acc);font-weight:800}
+  .an-hrs{color:#60a5fa;font-weight:700}
+  .an-eph{color:#fbbf24;font-weight:800}
+  .an-zero{color:var(--ink-faint);font-weight:600}
+  .bonus-v{font-size:26px;font-weight:800;color:var(--acc);padding:6px 4px 0;font-variant-numeric:tabular-nums}
+  .bonus-s{font-size:10px;color:var(--ink-faint);padding:0 4px 4px}
   .bulkbar .bb-date{display:inline-flex;align-items:center;gap:4px}
   .bulkbar .btn-danger{background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.45)}
   .bb-n{font-size:12px;font-weight:800;color:var(--acc);margin-right:4px}
@@ -1238,6 +1258,53 @@ function epDoneOn(day){return state.episodes.filter(e=>e.done&&e.dateLabeled===d
 function epDoneWeek(day){return state.episodes.filter(e=>e.done&&e.dateLabeled&&inWeek(e.dateLabeled,day)&&isFulltimeName(e.assignee));}
 function epDoneMonth(day){return state.episodes.filter(e=>e.done&&e.dateLabeled&&inMonth(e.dateLabeled,day)&&isFulltimeName(e.assignee));}
 function hoursOn(pred){let m=0;state.timeEntries.forEach(t=>{if(isFulltimeName(t.person)&&pred(t.day))m+=t.minutes||0;});return m/60;}
+/* ---------- analytics helpers (read-only; no state writes) ---------- */
+function epDoneAll(){return state.episodes.filter(e=>e.done&&isFulltimeName(e.assignee));}
+function hoursAll(){let m=0;state.timeEntries.forEach(t=>{if(isFulltimeName(t.person))m+=t.minutes||0;});return m/60;}
+function personEpisodes(p,scope,day){
+  return state.episodes.filter(e=>{
+    if(!e.done||e.assignee!==p)return false;
+    if(scope==='all')return true;
+    if(!e.dateLabeled)return false;
+    if(scope==='day')return e.dateLabeled===day;
+    if(scope==='week')return inWeek(e.dateLabeled,day);
+    if(scope==='month')return inMonth(e.dateLabeled,day);
+    return false;}).length;
+}
+function personHours(p,scope,day){
+  let m=0;
+  state.timeEntries.forEach(t=>{
+    if(t.person!==p)return;
+    if(scope!=='all'){
+      if(!t.day)return;
+      if(scope==='day'&&t.day!==day)return;
+      if(scope==='week'&&!inWeek(t.day,day))return;
+      if(scope==='month'&&!inMonth(t.day,day))return;
+    }
+    m+=t.minutes||0;});
+  return m/60;
+}
+function freelancerNames(){
+  const out=[],seen=new Set();
+  Object.keys(roleMap||{}).forEach(n=>{if(roleMap[n]==='freelancer'){const k=n.toLowerCase();if(!seen.has(k)){seen.add(k);out.push(n);}}});
+  return out.sort();
+}
+const KPI_TARGET=21;
+/* bonus = episodes completed ABOVE the daily 21 target, per full-timer per day */
+function bonusForDay(p,d){const n=state.episodes.filter(e=>e.done&&e.assignee===p&&e.dateLabeled===d).length;
+  return n>KPI_TARGET?(n-KPI_TARGET):0;}
+function bonusTotal(scope,day){
+  const names=fulltimeNames();
+  const days=[...new Set(state.episodes.filter(e=>e.done&&e.dateLabeled&&isFulltimeName(e.assignee)).map(e=>e.dateLabeled))];
+  let sum=0;
+  days.forEach(d=>{
+    if(scope==='day'&&d!==day)return;
+    if(scope==='week'&&!inWeek(d,day))return;
+    if(scope==='month'&&!inMonth(d,day))return;
+    names.forEach(p=>{sum+=bonusForDay(p,d);});
+  });
+  return sum;
+}
 function eph(eps,hrs){return hrs>0&&eps>0?Math.round(eps/hrs*100)/100:0;}
 function personDaily(p,day){return state.episodes.filter(e=>e.done&&e.dateLabeled===day&&e.assignee===p).length;}
 function personWeekly(p,day){return state.episodes.filter(e=>e.done&&e.dateLabeled&&inWeek(e.dateLabeled,day)&&e.assignee===p).length;}
@@ -1265,6 +1332,10 @@ function renderDashboard(){
   const dEps=epDoneOn(day).length,dHrs=hoursOn(d=>d===day),dEph=eph(dEps,dHrs);
   const wEps=epDoneWeek(day).length,wHrs=hoursOn(d=>inWeek(d,day)),wEph=eph(wEps,wHrs);
   const mEps=epDoneMonth(day).length,mHrs=hoursOn(d=>inMonth(d,day)),mEph=eph(mEps,mHrs);
+  const aEps=epDoneAll().length,aHrs=hoursAll(),aEph=eph(aEps,aHrs);
+  const bD=bonusTotal('day',day),bW=bonusTotal('week',day),bM=bonusTotal('month',day),bA=bonusTotal('all',day);
+  const ftNames=fulltimeNames().slice().sort();
+  const flNames=freelancerNames();
   const kpi=fulltimeNames().map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d).slice(0,10);
   const S=dashSeries(day);
   const wr=isoWeekRange(day);
@@ -1284,6 +1355,13 @@ function renderDashboard(){
      <div class="pp"><div class="pt2">Daily <span class="pth2">· ${prettyDate(day)}</span></div><div class="pg">${ps('Episodes',dEps.toLocaleString())+ps('Hours',fmtHrs(dHrs))+ps('EPH',dEph)}</div></div>
      <div class="pp"><div class="pt2">Weekly <span class="pth2">· ${wr[0].slice(5)} – ${wr[1].slice(5)}</span></div><div class="pg">${ps('Episodes',wEps.toLocaleString())+ps('Hours',fmtHrs(wHrs))+ps('EPH',wEph)}</div></div>
      <div class="pp"><div class="pt2">Monthly <span class="pth2">· ${day.slice(0,7)}</span></div><div class="pg">${ps('Episodes',mEps.toLocaleString())+ps('Hours',fmtHrs(mHrs))+ps('EPH',mEph)}</div></div>
+     <div class="pp"><div class="pt2">All time <span class="pth2">· full-time</span></div><div class="pg">${ps('Episodes',aEps.toLocaleString())+ps('Hours',fmtHrs(aHrs))+ps('EPH',aEph)}</div></div>
+   </div>
+   <div class="trio">
+     <div class="pp"><div class="pt2">KPI bonus · daily <span class="pth2">· ${prettyDate(day)}</span></div><div class="bonus-v">${bD.toLocaleString()}</div><div class="bonus-s">episodes above ${KPI_TARGET}/day</div></div>
+     <div class="pp"><div class="pt2">KPI bonus · weekly <span class="pth2">· ${wr[0].slice(5)} – ${wr[1].slice(5)}</span></div><div class="bonus-v">${bW.toLocaleString()}</div><div class="bonus-s">Mon–Sun</div></div>
+     <div class="pp"><div class="pt2">KPI bonus · monthly <span class="pth2">· ${day.slice(0,7)}</span></div><div class="bonus-v">${bM.toLocaleString()}</div><div class="bonus-s">this month</div></div>
+     <div class="pp"><div class="pt2">KPI bonus · all time</div><div class="bonus-v">${bA.toLocaleString()}</div><div class="bonus-s">total bonus episodes</div></div>
    </div>
    <div class="dash-main">
      <div class="dash-left">
@@ -1304,9 +1382,40 @@ function renderDashboard(){
            <div class="kmets">
              <div class="km"><div class="kmt"><span>Daily</span><span style="color:${dc}">${k.d}/${DAILY_TARGET}</span></div><div class="kbarx"><i style="width:${dp}%;background:${dc}"></i></div></div>
              <div class="km"><div class="kmt"><span>Weekly</span><span style="color:${wc}">${k.w}/${WEEKLY_TARGET}</span></div><div class="kbarx"><i style="width:${wp}%;background:${wc}"></i></div></div>
-           </div></div>`;}).join('')}
+           </div></div>
+
+`;}).join('')}
        </div>
      </div>
+   </div>
+   <div class="section-head" style="margin-top:22px"><h2>Full-time annotators</h2><span class="hint">episodes · hours · EPH</span></div>
+   <div class="an-table">
+     <div class="an-head an-ft"><div>Annotator</div>
+       <div>D · eps</div><div>D · hrs</div><div>D · EPH</div>
+       <div>W · eps</div><div>W · hrs</div><div>W · EPH</div>
+       <div>M · eps</div><div>M · hrs</div><div>M · EPH</div>
+       <div>All · eps</div><div>All · hrs</div><div>All · EPH</div></div>
+     ${ftNames.length?ftNames.map(p=>{
+        const de=personEpisodes(p,'day',day),  dh=personHours(p,'day',day);
+        const we=personEpisodes(p,'week',day), wh=personHours(p,'week',day);
+        const me2=personEpisodes(p,'month',day),mh=personHours(p,'month',day);
+        const ae=personEpisodes(p,'all',day),  ah=personHours(p,'all',day);
+        const N=(v,c)=>`<div class="${v?c:'an-zero'}">${v}</div>`;
+        return `<div class="an-row an-ft"><div class="an-name">${esc(p)}</div>
+          ${N(de,'an-eps')}${N(fmtHrs(dh),'an-hrs')}${N(eph(de,dh),'an-eph')}
+          ${N(we,'an-eps')}${N(fmtHrs(wh),'an-hrs')}${N(eph(we,wh),'an-eph')}
+          ${N(me2,'an-eps')}${N(fmtHrs(mh),'an-hrs')}${N(eph(me2,mh),'an-eph')}
+          ${N(ae.toLocaleString(),'an-eps')}${N(fmtHrs(ah),'an-hrs')}${N(eph(ae,ah),'an-eph')}</div>`;
+      }).join(''):'<div class="an-row"><div class="hint">No full-time annotators in the roster</div></div>'}
+   </div>
+   <div class="section-head" style="margin-top:22px"><h2>Freelancers</h2><span class="hint">episodes completed</span></div>
+   <div class="an-table">
+     <div class="an-head an-fl"><div>Freelancer</div><div>Daily</div><div>Weekly</div><div>Monthly</div><div>All time</div></div>
+     ${flNames.length?flNames.map(p=>{const d1=personEpisodes(p,'day',day),w1=personEpisodes(p,'week',day),
+        m1=personEpisodes(p,'month',day),a1=personEpisodes(p,'all',day);
+        const N=v=>`<div class="${v?'an-eps':'an-zero'}">${typeof v==='number'?v.toLocaleString():v}</div>`;
+        return `<div class="an-row an-fl"><div class="an-name">${esc(p)}</div>${N(d1)}${N(w1)}${N(m1)}${N(a1)}</div>`;}).join('')
+      :'<div class="an-row"><div class="hint">No freelancers in the roster</div></div>'}
    </div>`;
   app.querySelector('#dashDate').addEventListener('change',e=>{dashDate=e.target.value;renderDashboard();});
   destroyCharts();
