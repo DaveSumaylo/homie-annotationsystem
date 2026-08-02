@@ -169,6 +169,9 @@
   .trow:hover{background:var(--surface-2)}
   .trow .tlabel{font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
   .trow .tcount{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--ink-faint);flex:none}
+  .trow .terr{font-size:8.5px;font-weight:800;letter-spacing:.3px;padding:1px 6px;border-radius:20px;
+    background:rgba(220,38,38,.18);color:#f87171;border:1px solid rgba(220,38,38,.45);flex:none;margin-left:auto}
+  .trow .terr ~ .tnew,.trow .terr ~ .tcount,.trow .terr ~ .tclip{margin-left:8px}
   .trow .tnew{font-size:8.5px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:20px;background:rgba(16,168,116,.2);color:var(--acc);border:1px solid rgba(16,168,116,.45);flex:none;margin-left:auto}
   .trow .tnew ~ .tcount,.trow .tnew ~ .tclip{margin-left:8px}
   .tbot{font-weight:800;color:var(--ink);padding-left:6px}
@@ -1903,18 +1906,20 @@ function qcMonthsOf(bot){return [...new Set(qcDaysOf(bot).map(d=>d==='Undated'?'
 function qcDaysInMonth(bot,m){return qcDaysOf(bot).filter(d=>(d==='Undated'?'Undated':d.slice(0,7))===m);}
 function qcDayEpisodes(bot,day){return qcEpisodesFor(bot).filter(e=>dayOf(e)===day).sort((a,b)=>a.name<b.name?-1:1);}
 
+function qcErrTotal(eps){return eps.reduce((s,e)=>s+qcErrCount(e),0);}
 function qcTreeBot(bot){
   const eps=qcEpisodesFor(bot); if(!eps.length)return '';
   const bo=!qcCollapsed.has(bot); const months=qcMonthsOf(bot);
   const pend=eps.filter(e=>!e.qcChecked).length;
+  const bErr=qcErrTotal(eps);
   return `<div class="trow tbot" data-qcbot="${esc(bot)}">
       <button class="chev ${bo?'open':''}" tabindex="-1">${CHEVSVG}</button>
-      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span>${pend>0?`<span class="tnew" style="background:rgba(180,83,9,.2);color:var(--amber);border-color:rgba(180,83,9,.45)">${pend}</span>`:''}<span class="tcount">${eps.length}</span></div>
+      <span class="bot-emoji">${botIcon(bot)}</span><span class="tlabel">${esc(bot)}</span>${bErr>0?`<span class="terr" title="${bErr} error code${bErr===1?'':'s'}">⚠ ${bErr}</span>`:''}${pend>0?`<span class="tnew" style="background:rgba(180,83,9,.2);color:var(--amber);border-color:rgba(180,83,9,.45)">${pend}</span>`:''}<span class="tcount">${eps.length}</span></div>
     ${bo?months.map(m=>{const mo=qcOpenMonths.has(bot+'|'+m);const days=qcDaysInMonth(bot,m);
-      let t=0,c=0;days.forEach(d=>{const de=qcDayEpisodes(bot,d);t+=de.length;c+=de.filter(e=>e.qcChecked).length;});
-      return `<div class="trow tmonth" data-qcmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span><span class="tclip ${c<t?'warn':''}">${c}/${t}</span></div>
-        ${mo?days.map(d=>{const active=qcSel.bot===bot&&qcSel.day===d;const de=qcDayEpisodes(bot,d);const cd=de.filter(e=>e.qcChecked).length;
-          return `<div class="trow tday ${active?'active':''}" data-qcday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span><span class="tclip ${cd<de.length?'warn':''}">${cd}/${de.length}</span></div>`;}).join(''):''}`;}).join(''):''}`;
+      let t=0,c=0,mErr=0;days.forEach(d=>{const de=qcDayEpisodes(bot,d);t+=de.length;c+=de.filter(e=>e.qcChecked).length;mErr+=qcErrTotal(de);});
+      return `<div class="trow tmonth" data-qcmonth="${esc(bot)}|${esc(m)}"><button class="chev ${mo?'open':''}" tabindex="-1">${CHEVSVG}</button>${CALSVG}<span class="tlabel">${m==='Undated'?'Undated':esc(m)}</span>${mErr>0?`<span class="terr">⚠ ${mErr}</span>`:''}<span class="tclip ${c<t?'warn':''}">${c}/${t}</span></div>
+        ${mo?days.map(d=>{const active=qcSel.bot===bot&&qcSel.day===d;const de=qcDayEpisodes(bot,d);const cd=de.filter(e=>e.qcChecked).length;const dErr=qcErrTotal(de);
+          return `<div class="trow tday ${active?'active':''}" data-qcday="${esc(bot)}|${esc(d)}">${CALSVG}<span class="tlabel">${dayLabel(d)}</span>${dErr>0?`<span class="terr">⚠ ${dErr}</span>`:''}<span class="tclip ${cd<de.length?'warn':''}">${cd}/${de.length}</span></div>`;}).join(''):''}`;}).join(''):''}`;
 }
 
 function qcErrBlock(e){
