@@ -265,8 +265,11 @@
   .btn-req{background:var(--acc);color:#04231a;border:none;font-weight:800;font-size:12px;letter-spacing:.3px;padding:9px 16px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
   .btn-req:disabled{background:var(--surface-3);color:var(--ink-faint);cursor:not-allowed}
   .req-hint{font-size:11px;color:var(--ink-faint)}
-  .qc-cols{grid-template-columns:2.2fr .8fr 1fr .9fr 1fr 1.2fr .6fr .95fr}
-  .qc-cols>div:nth-child(2),.qc-cols>div:nth-child(8){text-align:center;justify-content:center}
+  .qc-cols{grid-template-columns:.4fr 2.1fr .8fr 1fr .9fr 1fr 1.1fr .6fr .95fr}
+  .qc-nm,.qc-dt{font-size:11px;padding:4px 6px}
+  .qc-dt{background:var(--surface-3);color:var(--ink);border:1px solid var(--border);border-radius:7px;font-family:inherit}
+  .qc-note{width:100%;margin-top:5px;font-size:11px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface-3);color:var(--ink);font-family:inherit}
+  .qc-cols>div:nth-child(3),.qc-cols>div:nth-child(9){text-align:center;justify-content:center}
   .qc-c{display:flex;align-items:center;justify-content:center}
   .qc-com{text-align:center;text-align-last:center;font-weight:800;text-transform:uppercase}
   .qc-com.com-ok{background:rgba(16,168,116,.18);color:var(--acc);border-color:rgba(16,168,116,.5)}
@@ -1891,7 +1894,7 @@ const QC_CODES=[['101','Unlabeled Actions'],['102','Missing Main Task / Fail Tas
  ['104','Missing "end"'],['105','Missing Moving Action (Start of main task)'],['106','Missing Moving Action (Between subtask)'],
  ['201','Wrong keyword used'],['202','Outdated Keywords'],['301','Human Intervention'],['302','Frozen Image / Fail'],
  ['303','Mislabeled (Labeled wrongly)'],['401','Timestamp/Gap Adjustment Needed']];
-let qcSel={bot:null,day:null};let qcBotFilter='';
+let qcSel={bot:null,day:null};let qcBotFilter='';const qcPicked=new Set();
 const qcCollapsed=new Set(), qcOpenMonths=new Set(), qcExpanded=new Set();
 
 function qcEpisodesFor(bot){return episodesFor(bot).filter(e=>e.done);}   /* completed only */
@@ -1919,7 +1922,9 @@ function qcErrBlock(e){
   const rows=list.map((m,i)=>`<div class="qc-mcap">
       <div class="qc-mcap-head"><b>MCap ${esc(String(m.mcap))}</b>
         <button class="btn btn-sm" data-qcdelmcap="${e.id}|${i}">Remove</button></div>
-      <div class="qc-codes">${(m.codes||[]).map((c,ci)=>`<span class="qc-code">${esc(c)} <button data-qcdelcode="${e.id}|${i}|${ci}">&times;</button></span>`).join('')||'<span class="hint">No codes</span>'}</div>
+      <div class="qc-codes">${(m.codes||[]).map((c,ci)=>{const cd=qcCodeOf(c),nt=qcNoteOf(c);
+        return `<span class="qc-code" title="${esc(qcCodeLabel(cd))}">${esc(cd)}${nt?' 💬':''} <button data-qcdelcode="${e.id}|${i}|${ci}">&times;</button></span>`;}).join('')||'<span class="hint">No codes</span>'}</div>
+      ${(m.codes||[]).map((c,ci)=>`<input class="qc-note" data-qcnote="${e.id}|${i}|${ci}" placeholder="Comment for ${esc(qcCodeOf(c))} — ${esc(qcCodeLabel(qcCodeOf(c)))}" value="${esc(qcNoteOf(c))}">`).join('')}
       <div class="qc-addcode"><select data-qccodesel="${e.id}|${i}"><option value="">Add error code…</option>${QC_CODES.map(([c,l])=>`<option value="${c}">${c} — ${esc(l)}</option>`).join('')}</select></div>
     </div>`).join('');
   return `<div class="qc-errors">${rows||'<div class="hint" style="padding:4px 0">No MCaps added</div>'}
@@ -1934,17 +1939,26 @@ function qcDetail(bot,day){
   return `<div class="detail-head"><span class="dh-emoji">${botIcon(bot)}</span>
       <div><div class="dh-title">${esc(bot)}</div><div class="dh-sub">${prettyDate(day)} · QC</div></div>
       <div class="dh-prog"><span class="dh-frac">${done}/${eps.length} checked</span></div></div>
+    ${qcPicked.size?`<div class="bulkbar">
+      <span class="bb-n">${qcPicked.size} selected</span>
+      <select id="qbCom"><option value="" disabled selected hidden>COMMENT</option><option value="__CLEAR__">— (clear)</option><option>OK</option><option>RELABEL</option><option>AMENDED</option></select>
+      <select id="qbName"><option value="" disabled selected hidden>QC NAME</option><option value="__ME__">${esc((me&&me.name)||'Me')}</option><option value="__CLEAR__">— (clear)</option></select>
+      <span class="bb-date"><input type="date" id="qbDate" title="Set check date"><button class="btn btn-sm" id="qbDateClr" title="Clear check date">✕</button></span>
+      <select id="qbChk"><option value="" disabled selected hidden>CHECKED</option><option value="1">Mark all checked</option><option value="0">Mark all unchecked</option></select>
+      <button class="btn btn-sm" id="qbClear">✕ Clear selection</button>
+    </div>`:''}
     <div class="gscroll"><div class="ginner qc-grid">
-      <div class="gcols qc-cols"><div>Episode</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>QC name</div><div>Check date</div><div>Checked</div><div>Comment</div></div>
+      <div class="gcols qc-cols"><div><input type="checkbox" class="g-check" id="qcAll" ${eps.length&&eps.every(e=>qcPicked.has(e.id))?'checked':''}></div><div>Episode</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>QC name</div><div>Check date</div><div>Checked</div><div>Comment</div></div>
       ${eps.map(e=>{const open=qcExpanded.has(e.id);const nerr=qcErrCount(e);
         return `<div class="qc-row-wrap">
         <div class="grow qc-cols">
+          <div><input type="checkbox" class="g-check" data-qcpick="${e.id}" ${qcPicked.has(e.id)?'checked':''}></div>
           <div class="ep-ro"><button class="qc-exp" data-qcexp="${e.id}">${open?'▾':'▸'}</button> ${esc(e.name)}${nerr?`<span class="qc-badge">${nerr}</span>`:''}</div>
           <div class="ep-ro qc-c">${esc(e.taskCode||'—')}</div>
           <div class="ep-ro">${esc(e.assignee||'—')}</div>
           <div class="ep-ro">${esc(e.dateLabeled||'—')}</div>
-          <div class="ep-ro">${esc(e.qcName||'—')}</div>
-          <div class="ep-ro">${e.qcDate?esc(qcDateOnly(e.qcDate)):'—'}</div>
+          <div><select class="g-asg qc-nm" data-qcname="${e.id}"><option value="">—</option>${qcNameOptions(e.qcName).map(n=>`<option ${n===e.qcName?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
+          <div><input type="date" class="g-date qc-dt" data-qcdate="${e.id}" value="${e.qcDate?esc(qcDateOnly(e.qcDate)):''}"></div>
           <div><input type="checkbox" class="g-check" data-qcchk="${e.id}" ${e.qcChecked?'checked':''}></div>
           <div class="qc-c"><select class="g-asg qc-com ${qcComClass(e.qcComment)}" data-qccom="${e.id}"><option value="">—</option>${['OK','RELABEL','AMENDED'].map(o=>`<option ${qcCom(e.qcComment)===o?'selected':''}>${o}</option>`).join('')}</select></div>
         </div>
@@ -1953,6 +1967,16 @@ function qcDetail(bot,day){
     </div></div>`;
 }
 
+function qcCodeOf(c){return (c&&typeof c==='object')?(c.code||''):String(c||'');}
+function qcNoteOf(c){return (c&&typeof c==='object')?(c.note||''):'';}
+function qcCodeLabel(code){const hit=QC_CODES.find(x=>x[0]===String(code));return hit?hit[1]:'';}
+function qcNameOptions(cur){
+  const out=[],seen=new Set();
+  Object.keys(roleMap||{}).forEach(n=>{if(roleMap[n]==='qc'||roleMap[n]==='manager'){const k=n.toLowerCase();if(!seen.has(k)){seen.add(k);out.push(n);}}});
+  const mine=(me&&me.name)||''; if(mine&&!seen.has(mine.toLowerCase())){seen.add(mine.toLowerCase());out.push(mine);}
+  if(cur&&!seen.has(cur.toLowerCase()))out.push(cur);
+  return out;
+}
 function qcCom(v){return (v||'').trim().toUpperCase();}
 function qcComClass(v){const c=qcCom(v);return c==='OK'?'com-ok':c==='RELABEL'?'com-re':c==='AMENDED'?'com-am':'';}
 function qcDateOnly(d){try{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}catch(e){return '';}}
@@ -1979,6 +2003,49 @@ function renderQC(){
   app.querySelectorAll('[data-qcbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.qcbot;qcCollapsed.has(b)?qcCollapsed.delete(b):qcCollapsed.add(b);renderQC();}));
   app.querySelectorAll('[data-qcmonth]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.qcmonth;qcOpenMonths.has(k)?qcOpenMonths.delete(k):qcOpenMonths.add(k);renderQC();}));
   app.querySelectorAll('[data-qcday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.qcday.split('|');qcSel={bot:b,day:d};renderQC();}));
+  const qall=app.querySelector('#qcAll');
+  if(qall)qall.addEventListener('change',ev=>{const eps=qcDayEpisodes(qcSel.bot,qcSel.day);
+    if(ev.target.checked)eps.forEach(e=>qcPicked.add(e.id)); else eps.forEach(e=>qcPicked.delete(e.id));
+    renderQC();});
+  app.querySelectorAll('[data-qcpick]').forEach(el=>el.addEventListener('change',ev=>{
+    const id=el.dataset.qcpick; ev.target.checked?qcPicked.add(id):qcPicked.delete(id); renderQC();}));
+  app.querySelectorAll('[data-qcname]').forEach(el=>el.addEventListener('change',ev=>{
+    const e=state.episodes.find(x=>x.id===el.dataset.qcname);if(!e)return;
+    e.qcName=ev.target.value;qcSave();}));
+  app.querySelectorAll('[data-qcdate]').forEach(el=>el.addEventListener('change',ev=>{
+    const e=state.episodes.find(x=>x.id===el.dataset.qcdate);if(!e)return;
+    e.qcDate=ev.target.value?new Date(ev.target.value+'T00:00:00').toISOString():'';qcSave();}));
+  app.querySelectorAll('[data-qcnote]').forEach(el=>el.addEventListener('change',ev=>{
+    const [id,i,ci]=el.dataset.qcnote.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
+    const m=e.qcErrors[+i];if(!m||!m.codes[+ci])return;
+    const cur=m.codes[+ci];
+    m.codes[+ci]={code:qcCodeOf(cur),note:ev.target.value};
+    qcSave();}));
+  /* bulk actions */
+  const qbc=app.querySelector('#qbCom');
+  if(qbc)qbc.addEventListener('change',ev=>{const v=ev.target.value;if(!v)return;
+    const val=(v==='__CLEAR__')?'':qcCom(v);
+    qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcComment=val;});
+    qcSave();renderQC();toast('Comment set on '+qcPicked.size);});
+  const qbn=app.querySelector('#qbName');
+  if(qbn)qbn.addEventListener('change',ev=>{const v=ev.target.value;if(!v)return;
+    const val=(v==='__CLEAR__')?'':((me&&me.name)||'');
+    qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcName=val;});
+    qcSave();renderQC();toast('QC name set on '+qcPicked.size);});
+  const qbd=app.querySelector('#qbDate');
+  if(qbd)qbd.addEventListener('change',ev=>{const d=ev.target.value;if(!d)return;
+    const iso=new Date(d+'T00:00:00').toISOString();
+    qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcDate=iso;});
+    qcSave();renderQC();toast('Check date set on '+qcPicked.size);});
+  const qbdc=app.querySelector('#qbDateClr');
+  if(qbdc)qbdc.addEventListener('click',()=>{qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcDate='';});
+    qcSave();renderQC();toast('Check date cleared');});
+  const qbk=app.querySelector('#qbChk');
+  if(qbk)qbk.addEventListener('change',ev=>{const v=ev.target.value;if(v==='')return;const on=(v==='1');
+    qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(!e)return;e.qcChecked=on;qcStamp(e);});
+    qcSave();renderQC();toast((on?'Marked checked · ':'Marked unchecked · ')+qcPicked.size);});
+  const qbcl=app.querySelector('#qbClear');
+  if(qbcl)qbcl.addEventListener('click',()=>{qcPicked.clear();renderQC();});
   app.querySelectorAll('[data-qcexp]').forEach(el=>el.addEventListener('click',()=>{const id=el.dataset.qcexp;qcExpanded.has(id)?qcExpanded.delete(id):qcExpanded.add(id);renderQC();}));
   app.querySelectorAll('[data-qcchk]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qcchk);if(!e)return;e.qcChecked=ev.target.checked;qcStamp(e);qcSave();renderQC();}));
   app.querySelectorAll('[data-qccom]').forEach(el=>el.addEventListener('change',ev=>{const e=state.episodes.find(x=>x.id===el.dataset.qccom);if(!e)return;e.qcComment=qcCom(ev.target.value);qcSave();renderQC();}));
@@ -1995,8 +2062,11 @@ function renderQC(){
   app.querySelectorAll('[data-qccodesel]').forEach(el=>el.addEventListener('change',ev=>{
     const [id,i]=el.dataset.qccodesel.split('|');const v=ev.target.value;if(!v)return;
     const e=state.episodes.find(x=>x.id===id);if(!e)return;const m=e.qcErrors[+i];if(!m)return;
-    m.codes=m.codes||[];if(m.codes.includes(v)){toast('Code already added');return;}
-    m.codes.push(v);m.codes.sort();qcAutoComment(e);qcSave();renderQC();}));
+    m.codes=m.codes||[];
+    if(m.codes.some(c=>qcCodeOf(c)===v)){toast('Code already added');return;}
+    m.codes.push({code:v,note:''});
+    m.codes.sort((a,b)=>qcCodeOf(a)<qcCodeOf(b)?-1:1);
+    qcAutoComment(e);qcSave();renderQC();}));
   app.querySelectorAll('[data-qcdelcode]').forEach(el=>el.addEventListener('click',()=>{
     const [id,i,ci]=el.dataset.qcdelcode.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
     e.qcErrors[+i].codes.splice(+ci,1);qcAutoComment(e);qcSave();renderQC();}));
