@@ -1947,7 +1947,7 @@ function qcDetail(bot,day){
     ${qcPicked.size?`<div class="bulkbar">
       <span class="bb-n">${qcPicked.size} selected</span>
       <select id="qbCom"><option value="" disabled selected hidden>COMMENT</option><option value="__CLEAR__">— (clear)</option><option>OK</option><option>RELABEL</option><option>AMENDED</option></select>
-      <select id="qbName"><option value="" disabled selected hidden>QC NAME</option><option value="__ME__">${esc((me&&me.name)||'Me')}</option><option value="__CLEAR__">— (clear)</option></select>
+      <select id="qbName"><option value="" disabled selected hidden>QC NAME</option><option value="__CLEAR__">— (clear)</option>${qcNameOptions('').map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
       <span class="bb-date"><input type="date" id="qbDate" title="Set check date"><button class="btn btn-sm" id="qbDateClr" title="Clear check date">✕</button></span>
       <select id="qbChk"><option value="" disabled selected hidden>CHECKED</option><option value="1">Mark all checked</option><option value="0">Mark all unchecked</option></select>
       <button class="btn btn-sm" id="qbClear">✕ Clear selection</button>
@@ -2034,7 +2034,7 @@ function renderQC(){
     qcSave();renderQC();toast('Comment set on '+qcPicked.size);});
   const qbn=app.querySelector('#qbName');
   if(qbn)qbn.addEventListener('change',ev=>{const v=ev.target.value;if(!v)return;
-    const val=(v==='__CLEAR__')?'':((me&&me.name)||'');
+    const val=(v==='__CLEAR__')?'':v;
     qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcName=val;});
     qcSave();renderQC();toast('QC name set on '+qcPicked.size);});
   const qbd=app.querySelector('#qbDate');
