@@ -629,6 +629,37 @@ function uid(){return 'e'+Math.random().toString(36).slice(2,9)+Date.now().toStr
 function episodesFor(bot){return state.episodes.filter(e=>e.bot===bot);}
 function dayOf(e){return state.dayOverrides[e.id]||dateFromName(e.name);}
 function dayEpisodes(bot,day){return episodesFor(bot).filter(e=>dayOf(e)===day).sort((a,b)=>a.name<b.name?-1:1);}
+let srvBotTotals=null, srvPersonTotals=null, srvTotalsAt=0;
+function verifyTotals(){
+  if(!srvBotTotals){console.warn('server totals not loaded yet');return;}
+  const rows=[];let bad=0;
+  state.bots.forEach(b=>{
+    const loc=statsOf(episodesFor(b)); const s=srvBotTotals[b];
+    if(!s){rows.push({bot:b,local_total:loc.total,server_total:'—',match:'no server row'});return;}
+    const ok=(loc.total===+s.total)&&(loc.done===+s.done);
+    if(!ok)bad++;
+    rows.push({bot:b,local_total:loc.total,server_total:+s.total,local_done:loc.done,server_done:+s.done,match:ok?'OK':'MISMATCH'});
+  });
+  console.table(rows);
+  console.log(bad?('%c'+bad+' bot(s) MISMATCH'):'%cAll bot totals match',bad?'color:#f87171;font-weight:bold':'color:#10a874;font-weight:bold');
+  return rows;
+}
+async function refreshServerTotals(force){
+  if(!CLOUD||!session)return;
+  if(!force&&Date.now()-srvTotalsAt<60000)return;   /* at most once a minute */
+  try{
+    const [bt,pt]=await Promise.all([sbRpc('bot_totals',{}),sbRpc('person_totals',{})]);
+    if(Array.isArray(bt)){const m={};bt.forEach(r=>{m[r.bot]=r;});srvBotTotals=m;}
+    if(Array.isArray(pt)){const m={};pt.forEach(r=>{m[r.person]=r;});srvPersonTotals=m;}
+    srvTotalsAt=Date.now();
+  }catch(e){console.warn('server totals unavailable, using local counts',e);}
+}
+/* server-backed counts with a local fallback, so nothing breaks if the RPC is missing */
+function botStatsSrv(bot){
+  const r=srvBotTotals&&srvBotTotals[bot];
+  if(r)return{total:+r.total,done:+r.done,pct:(+r.total)?Math.round((+r.done)/(+r.total)*100):0};
+  return botStats(bot);
+}
 function botStats(bot){return statsOf(episodesFor(bot));}
 function statsOf(eps){const done=eps.filter(e=>e.done).length;return{total:eps.length,done,pct:eps.length?Math.round(done/eps.length*100):0};}
 function overall(){const total=state.episodes.length;const done=state.episodes.filter(e=>e.done).length;const activeBots=state.bots.filter(b=>episodesFor(b).length>0).length;return{total,done,pending:total-done,activeBots};}
@@ -2224,6 +2255,8 @@ async function enterApp(){
   engineFillQueue();
   setInterval(cloudPoll,15000);
   setInterval(fetchRoster,60000);
+  refreshServerTotals(true);
+  setInterval(()=>refreshServerTotals(false),60000);
   window.addEventListener('focus',cloudPoll);
 }
 function showLogin(){
