@@ -787,10 +787,20 @@ function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annot
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
 async function cloudCount(){const r=await sbFetch('episodes?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
-async function cloudLoadAll(){const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
+async function cloudLoadAll(){const _t0=Date.now();let _reqs=0;const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudLoadMeta(){try{const r=await sbFetch('app_meta?id=eq.1&select=data',{headers:sbHeaders()});const j=await r.json();return (j[0]&&j[0].data)||null;}catch(e){return null;}}
 async function cloudLoad(){
+  const _boot=Date.now();
   const rows=await cloudLoadAll();
+  try{
+    const secs=((Date.now()-_boot)/1000).toFixed(1);
+    const kb=Math.round(JSON.stringify(rows).length/1024);
+    console.log('%c[Project Homie] episode load','color:#10a874;font-weight:bold',
+      '\n  episodes : '+rows.length.toLocaleString(),
+      '\n  time     : '+secs+'s',
+      '\n  payload  : ~'+kb.toLocaleString()+' KB',
+      '\n  requests : '+Math.ceil(rows.length/1000));
+  }catch(e){}
   epWatermark=maxWm(rows,null);
   state.episodes=rows.map(rowToEp);
   const meta=await cloudLoadMeta();
