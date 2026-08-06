@@ -629,6 +629,37 @@ function uid(){return 'e'+Math.random().toString(36).slice(2,9)+Date.now().toStr
 function episodesFor(bot){return state.episodes.filter(e=>e.bot===bot);}
 function dayOf(e){return state.dayOverrides[e.id]||dateFromName(e.name);}
 function dayEpisodes(bot,day){return episodesFor(bot).filter(e=>dayOf(e)===day).sort((a,b)=>a.name<b.name?-1:1);}
+let srvBotTotals=null, srvPersonTotals=null, srvTotalsAt=0;
+function verifyTotals(){
+  if(!srvBotTotals){console.warn('server totals not loaded yet');return;}
+  const rows=[];let bad=0;
+  state.bots.forEach(b=>{
+    const loc=statsOf(episodesFor(b)); const s=srvBotTotals[b];
+    if(!s){rows.push({bot:b,local_total:loc.total,server_total:'—',match:'no server row'});return;}
+    const ok=(loc.total===+s.total)&&(loc.done===+s.done);
+    if(!ok)bad++;
+    rows.push({bot:b,local_total:loc.total,server_total:+s.total,local_done:loc.done,server_done:+s.done,match:ok?'OK':'MISMATCH'});
+  });
+  console.table(rows);
+  console.log(bad?('%c'+bad+' bot(s) MISMATCH'):'%cAll bot totals match',bad?'color:#f87171;font-weight:bold':'color:#10a874;font-weight:bold');
+  return rows;
+}
+async function refreshServerTotals(force){
+  if(!CLOUD||!session)return;
+  if(!force&&Date.now()-srvTotalsAt<60000)return;   /* at most once a minute */
+  try{
+    const [bt,pt]=await Promise.all([sbRpc('bot_totals',{}),sbRpc('person_totals',{})]);
+    if(Array.isArray(bt)){const m={};bt.forEach(r=>{m[r.bot]=r;});srvBotTotals=m;}
+    if(Array.isArray(pt)){const m={};pt.forEach(r=>{m[r.person]=r;});srvPersonTotals=m;}
+    srvTotalsAt=Date.now();
+  }catch(e){console.warn('server totals unavailable, using local counts',e);}
+}
+/* server-backed counts with a local fallback, so nothing breaks if the RPC is missing */
+function botStatsSrv(bot){
+  const r=srvBotTotals&&srvBotTotals[bot];
+  if(r)return{total:+r.total,done:+r.done,pct:(+r.total)?Math.round((+r.done)/(+r.total)*100):0};
+  return botStats(bot);
+}
 function botStats(bot){return statsOf(episodesFor(bot));}
 function statsOf(eps){const done=eps.filter(e=>e.done).length;return{total:eps.length,done,pct:eps.length?Math.round(done/eps.length*100):0};}
 function overall(){const total=state.episodes.length;const done=state.episodes.filter(e=>e.done).length;const activeBots=state.bots.filter(b=>episodesFor(b).length>0).length;return{total,done,pending:total-done,activeBots};}
@@ -787,10 +818,67 @@ function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annot
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
 async function cloudCount(){const r=await sbFetch('episodes?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
-async function cloudLoadAll(){const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
+const EP_WINDOW_DAYS=30;
+function windowStartISO(){const d=new Date();d.setDate(d.getDate()-EP_WINDOW_DAYS);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+/* fetch a bounded set of episodes (recent window, or an explicit date range) */
+async function cloudLoadRange(fromISO,toISO){
+  const all=[];let off=0;const page=1000;
+  let flt='&recording_date=gte.'+encodeURIComponent(fromISO);
+  if(toISO)flt+='&recording_date=lte.'+encodeURIComponent(toISO);
+  while(true){
+    const r=await sbFetch('episodes?select=*'+flt+'&order=id&limit='+page+'&offset='+off,{headers:sbHeaders()});
+    const rows=await r.json();
+    all.push(...rows);
+    if(rows.length<page)break;
+    off+=page;
+  }
+  return all;
+}
+/* merge fetched rows into state without disturbing local edits */
+function mergeLoadedRows(rows){
+  const have=new Map(state.episodes.map(e=>[e.id,e]));
+  let added=0;
+  rows.forEach(r=>{
+    if(pendingEpDeletes.has(r.id))return;
+    const ex=have.get(r.id);
+    const inc=rowToEp(r);
+    if(!ex){state.episodes.push(inc);added++;syncedEps.set(inc.id,epSig(inc));}
+    else{
+      const pending=epSig(ex)!==syncedEps.get(ex.id);
+      if(!pending&&epSig(ex)!==epSig(inc)){Object.assign(ex,inc);}
+      if(ex.isNew!==inc.isNew)ex.isNew=inc.isNew;
+      syncedEps.set(ex.id,epSig(ex));
+    }
+    epWatermark=maxWm([r],epWatermark);
+  });
+  return added;
+}
+/* load anything older than the window, quietly, after the app is usable */
+let _bgLoaded=false;
+async function backgroundLoadOlder(){
+  if(_bgLoaded||!CLOUD||!session)return; _bgLoaded=true;
+  try{
+    const rows=await cloudLoadRange('0000-01-01',windowStartISO());
+    const n=mergeLoadedRows(rows);
+    if(n){persistLocal();if(!isTypingNow())render();}
+    console.log('%c[Project Homie] older episodes loaded in background','color:#10a874','+'+n.toLocaleString());
+  }catch(e){console.warn('background load failed',e);_bgLoaded=false;}
+}
+async function cloudLoadAll(){const _t0=Date.now();let _reqs=0;const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudLoadMeta(){try{const r=await sbFetch('app_meta?id=eq.1&select=data',{headers:sbHeaders()});const j=await r.json();return (j[0]&&j[0].data)||null;}catch(e){return null;}}
 async function cloudLoad(){
-  const rows=await cloudLoadAll();
+  const _boot=Date.now();
+  const rows=await cloudLoadRange(windowStartISO(),null);
+  try{
+    const secs=((Date.now()-_boot)/1000).toFixed(1);
+    const kb=Math.round(JSON.stringify(rows).length/1024);
+    console.log('%c[Project Homie] episode load (windowed '+EP_WINDOW_DAYS+'d)','color:#10a874;font-weight:bold',
+      '\n  episodes : '+rows.length.toLocaleString(),
+      '\n  time     : '+secs+'s',
+      '\n  payload  : ~'+kb.toLocaleString()+' KB',
+      '\n  requests : '+Math.ceil(rows.length/1000));
+  }catch(e){}
   epWatermark=maxWm(rows,null);
   state.episodes=rows.map(rowToEp);
   const meta=await cloudLoadMeta();
@@ -831,7 +919,9 @@ async function cloudFlush(){
   try{
     const cur=new Map(state.episodes.map(e=>[e.id,e]));
     const changed=[];for(const [id,e] of cur){if(syncedEps.get(id)!==epSig(e))changed.push(e);}
-    const removed=[];for(const id of syncedEps.keys())if(!cur.has(id))removed.push(id);
+    /* WINDOWED LOADING: an episode missing locally may simply be outside the loaded
+       window. Only delete what the user explicitly deleted. */
+    const removed=[];for(const id of pendingEpDeletes)if(!cur.has(id))removed.push(id);
     if(changed.length)await cloudChunkUpsert(changed.map(epToRow));
     if(removed.length)await cloudChunkDelete(removed);
     const ms=metaSig();if(ms!==syncedMeta){await cloudPushMeta();syncedMeta=ms;}
@@ -855,7 +945,13 @@ function handlePollErr(e){const m=String((e&&e.message)||'');
   if(m.indexOf('updated_at')>=0||m.indexOf('42703')>=0){if(!pollDisabled){pollDisabled=true;toast('Live sync needs an upgrade — run supabase_sync_upgrade.sql');}}
   else console.error('poll',e);}
 async function fullEpisodeResync(){
-  const rows=await cloudLoadAll();epWatermark=maxWm(rows,epWatermark);
+  /* windowed: re-pull the recent window and merge; older episodes already in
+     memory are kept, never dropped */
+  const rows=await cloudLoadRange(windowStartISO(),null);epWatermark=maxWm(rows,epWatermark);
+  mergeLoadedRows(rows);
+  syncedEps=new Map(state.episodes.map(e=>[e.id,epSig(e)]));
+  return;
+  /* legacy full-replace path (unused) */
   const cmap=new Map(rows.map(r=>[r.id,r]));
   const pendEdits=new Map(state.episodes.filter(e=>cmap.has(e.id)&&epSig(e)!==syncedEps.get(e.id)).map(e=>[e.id,e]));
   const keepAdds=state.episodes.filter(e=>!cmap.has(e.id)&&epSig(e)!==syncedEps.get(e.id));
@@ -875,6 +971,27 @@ async function fullTimeResync(){
   state.timeEntries=raw.filter(r=>!deletedTimeIds.has(r.id)).map(r=>pendEdits.get(r.id)||mapT(r)).concat(keepAdds);
   syncedTimes=new Map(raw.map(r=>[r.id,timeSig(mapT(r))]));
 }
+/* ---------- adaptive polling ----------
+   active tab + recent activity -> 15s (unchanged for users)
+   background tab               -> 60s
+   idle > 10 min                -> 120s
+   returning to the tab polls immediately. */
+let lastActivity=Date.now(), pollTimer=null;
+function pollInterval(){
+  if(document.hidden)return 60000;
+  const idleMs=Date.now()-lastActivity;
+  if(idleMs>10*60*1000)return 120000;
+  return 15000;
+}
+function schedulePoll(){
+  clearTimeout(pollTimer);
+  pollTimer=setTimeout(function tick(){
+    cloudPoll();
+    clearTimeout(pollTimer);
+    pollTimer=setTimeout(tick,pollInterval());
+  },pollInterval());
+}
+function startAdaptivePoll(){schedulePoll();}
 async function cloudPoll(){
   if(!CLOUD||!session||pollDisabled||polling||syncing)return;
   polling=true;
@@ -1947,7 +2064,7 @@ function qcDetail(bot,day){
     ${qcPicked.size?`<div class="bulkbar">
       <span class="bb-n">${qcPicked.size} selected</span>
       <select id="qbCom"><option value="" disabled selected hidden>COMMENT</option><option value="__CLEAR__">— (clear)</option><option>OK</option><option>RELABEL</option><option>AMENDED</option></select>
-      <select id="qbName"><option value="" disabled selected hidden>QC NAME</option><option value="__ME__">${esc((me&&me.name)||'Me')}</option><option value="__CLEAR__">— (clear)</option></select>
+      <select id="qbName"><option value="" disabled selected hidden>QC NAME</option><option value="__CLEAR__">— (clear)</option>${qcNameOptions('').map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
       <span class="bb-date"><input type="date" id="qbDate" title="Set check date"><button class="btn btn-sm" id="qbDateClr" title="Clear check date">✕</button></span>
       <select id="qbChk"><option value="" disabled selected hidden>CHECKED</option><option value="1">Mark all checked</option><option value="0">Mark all unchecked</option></select>
       <button class="btn btn-sm" id="qbClear">✕ Clear selection</button>
@@ -2034,7 +2151,7 @@ function renderQC(){
     qcSave();renderQC();toast('Comment set on '+qcPicked.size);});
   const qbn=app.querySelector('#qbName');
   if(qbn)qbn.addEventListener('change',ev=>{const v=ev.target.value;if(!v)return;
-    const val=(v==='__CLEAR__')?'':((me&&me.name)||'');
+    const val=(v==='__CLEAR__')?'':v;
     qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcName=val;});
     qcSave();renderQC();toast('QC name set on '+qcPicked.size);});
   const qbd=app.querySelector('#qbDate');
@@ -2212,9 +2329,17 @@ async function enterApp(){
   startWallClock();
   hideBoot();
   engineFillQueue();
-  setInterval(cloudPoll,15000);
+  startAdaptivePoll();
   setInterval(fetchRoster,60000);
-  window.addEventListener('focus',cloudPoll);
+  refreshServerTotals(true);
+  setTimeout(backgroundLoadOlder,1500);   /* fill history after the app is usable */
+  setInterval(()=>refreshServerTotals(false),60000);
+  window.addEventListener('focus',()=>{lastActivity=Date.now();cloudPoll();schedulePoll();});
+  ['mousedown','keydown','touchstart','scroll'].forEach(ev=>
+    window.addEventListener(ev,()=>{lastActivity=Date.now();},{passive:true}));
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden){lastActivity=Date.now();cloudPoll();}
+    schedulePoll();});
 }
 function showLogin(){
   hideBoot();
