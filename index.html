@@ -443,6 +443,21 @@
   .login-sub{font-size:10.5px;color:var(--ink-faint);font-weight:700;letter-spacing:.8px;margin-bottom:8px}
   .login-card input{width:100%;text-transform:none}
   .login-err{font-size:12px;color:#fca5a5;min-height:16px;font-weight:600;text-transform:none}
+  .osp{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+  .os-row{display:grid;grid-template-columns:1.4fr .7fr 1.6fr;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11.5px}
+  .os-row:last-child{border-bottom:none}
+  .os-name{font-weight:800;text-transform:none}
+  .os-time{font-variant-numeric:tabular-nums;font-weight:700}
+  .os-note{font-size:10.5px;text-align:right}
+  .os-row.os-ok .os-time{color:var(--acc)}
+  .os-row.os-warn{background:rgba(180,83,9,.08)} .os-row.os-warn .os-time,.os-row.os-warn .os-note{color:var(--amber)}
+  .os-row.os-bad{background:rgba(220,38,38,.10)} .os-row.os-bad .os-time,.os-row.os-bad .os-note{color:#f87171;font-weight:800}
+  .shiftbadge{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.3px;
+    padding:5px 11px;border-radius:20px;margin-right:10px;white-space:nowrap}
+  .shiftbadge .sb-dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+  .shiftbadge.sb-ok{background:rgba(16,168,116,.16);color:var(--acc);border:1px solid rgba(16,168,116,.4)}
+  .shiftbadge.sb-warn{background:rgba(180,83,9,.18);color:var(--amber);border:1px solid rgba(180,83,9,.45)}
+  .shiftbadge.sb-bad{background:rgba(220,38,38,.18);color:#f87171;border:1px solid rgba(220,38,38,.5)}
   .userchip{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:4px 4px 4px 12px}
   .uc-name{font-size:12.5px;font-weight:700;text-transform:none}
   .uc-role{font-size:9px;font-weight:800;color:var(--acc);background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:12px;padding:2px 8px}
@@ -522,6 +537,7 @@
       <button id="tabBacklog" data-mode="backlog" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>Backlog</button>
       <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
     </div>
+    <span class="shiftbadge" id="shiftBadge" style="display:none"></span>
     <div class="userchip" id="userChip" style="display:none"><span class="uc-name" id="userName"></span><span class="uc-role" id="userRole"></span><button class="icon-btn" id="btnSignOut" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button></div>
     <span id="syncDot" class="syncdot off" title="Local only — not synced to cloud"></span>
     <button class="icon-btn" id="btnSettings" title="Settings" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
@@ -1305,6 +1321,37 @@ function fmtHrs(hh){return (Math.round(hh*100)/100).toString();}
 function nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function openShifts(){return state.timeEntries.filter(t=>t.start&&!t.end);}
 function isOnClock(p){return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end);}
+function openShiftFor(p){return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end)||null;}
+function openShiftsPanel(){
+  const today=todayISO();
+  const open=state.timeEntries.filter(t=>t.start&&!t.end)
+    .map(t=>{const mins=minutesBetween(t.start,today+'T'+nowHM());
+      return {person:t.person,day:t.day,mins:(mins==null||mins<0)?0:mins,stale:t.day<today};})
+    .sort((a,b)=>(b.stale-a.stale)||(b.mins-a.mins));
+  if(!open.length)return '';
+  const stale=open.filter(o=>o.stale).length;
+  return `<div class="section-head" style="margin-top:4px"><h2>Currently clocked in</h2>
+      <span class="hint">${open.length} open shift${open.length===1?'':'s'}${stale?` · ${stale} from a previous day`:''}</span></div>
+    <div class="osp">${open.map(o=>{
+      const hrs=o.mins/60; const cls=o.stale?'os-bad':(hrs>=10?'os-bad':(hrs>=8?'os-warn':'os-ok'));
+      return `<div class="os-row ${cls}"><span class="os-name">${esc(o.person)}</span>
+        <span class="os-time">${Math.floor(o.mins/60)}h ${String(o.mins%60).padStart(2,'0')}m</span>
+        <span class="os-note">${o.stale?'⚠ not clocked out — '+esc(o.day):(hrs>=8?'long shift':'on shift')}</span></div>`;}).join('')}</div>`;
+}
+function updateShiftBadge(){
+  const el=document.getElementById('shiftBadge');if(!el)return;
+  const who=(!isManager()&&!isFreelancer())?myAnnotatorName():null;
+  const t=who?openShiftFor(who):null;
+  if(!t){el.style.display='none';return;}
+  const mins=minutesBetween(t.start,todayISO()+'T'+nowHM());
+  const m=(mins==null||mins<0)?0:mins;
+  const hrs=m/60;
+  let cls='sb-ok'; if(hrs>=10)cls='sb-bad'; else if(hrs>=8)cls='sb-warn';
+  el.className='shiftbadge '+cls;
+  el.style.display='';
+  el.title=(hrs>=8?'You have been clocked in a long time — remember to clock out.':'You are clocked in.');
+  el.innerHTML='<span class="sb-dot"></span>Clocked in · '+Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m';
+}
 function clockInPerson(p){
   if(!p)return;
   if(isOnClock(p)){toast(p+' is already clocked in');return;}
@@ -1330,6 +1377,7 @@ function clockOutPerson(p){
   renderTimeLog();
 }
 function tickWallClock(){
+  updateShiftBadge();
   const el=document.getElementById('wallTime');if(!el)return;
   const d=new Date();
   el.textContent=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -1731,6 +1779,7 @@ function renderManager(){
       <div class="stat s-pend"><div class="k">Pending</div><div class="v" style="color:var(--amber)">${o.pending}</div><div class="sub">awaiting annotation</div></div>
       <div class="stat s-new"><div class="k">Fresh · new</div><div class="v" style="color:var(--acc)">${freshTotal}</div><div class="sub">unassigned, never touched</div></div>
     </div>
+    ${openShiftsPanel()}
     <div class="section-head"><h2>Bots</h2>${isManager()?'':'<span class="hint">view only</span>'}</div>
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
   if(isManager())app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>{mgrBot=c.dataset.bot;mgrDay=null;selectedIds.clear();addOpen=false;render();}));
