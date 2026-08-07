@@ -263,6 +263,7 @@
   .bc-tag.fl{background:rgba(180,83,9,.18);color:var(--amber);border:1px solid rgba(180,83,9,.4)}
   .bc-pn{font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
   .bc-chk{color:var(--acc);font-weight:800}
+  .bc-pn.bc-open{color:var(--amber)}
   .bc-none{color:var(--ink-faint);font-style:italic;font-size:10.5px}
   .req-bar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px}
   .btn-req{background:var(--acc);color:#04231a;border:none;font-weight:800;font-size:12px;letter-spacing:.3px;padding:9px 16px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
@@ -780,9 +781,10 @@ function isFreelancerName(name){return nameRole(name)==='freelancer';}
 function isManager(){return me.role==='manager';}
 function isFreelancer(){return me.role==='freelancer';}
 function isQC(){return me.role==='qc';}
+function isFullTimeUser(){return me.role==='fulltime'||me.role==='annotator';}
 function isWorker(){return me.role==='fulltime'||me.role==='freelancer'||me.role==='annotator';}
 function applyRole(){
-  const tm=document.getElementById('tabManager');if(tm)tm.style.display=isManager()?'':'none';
+  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser())?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
@@ -794,7 +796,7 @@ function applyRole(){
   if(isFreelancer()&&mode!=='backlog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}  /* freelancer: backlog-only workspace */
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
-  if(!isManager()&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(!(isManager()||isFullTimeUser())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isFreelancer()&&mode==='timelog'){mode='annotator';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isQC()){   /* QC: QC tab + Dashboard + Time Log (clock in/out for records) */
     ['tabEpisodes','tabBacklog','tabManager','btnSettings'].forEach(function(id){
@@ -1718,6 +1720,7 @@ function render(){ if(isQC()&&!['qc','dashboard','timelog'].includes(mode))mode=
 
 /* ---------- Manager ---------- */
 function renderManager(){
+  if(mgrBot&&!isManager()){mgrBot=null;}          /* view-only for full-timers */
   if(mgrBot){renderMgrBot();return;}
   const o=overall();
   const freshTotal=state.episodes.filter(e=>e.isNew&&!e.done&&!(e.assignee&&e.assignee.trim())).length;
@@ -1728,9 +1731,9 @@ function renderManager(){
       <div class="stat s-pend"><div class="k">Pending</div><div class="v" style="color:var(--amber)">${o.pending}</div><div class="sub">awaiting annotation</div></div>
       <div class="stat s-new"><div class="k">Fresh · new</div><div class="v" style="color:var(--acc)">${freshTotal}</div><div class="sub">unassigned, never touched</div></div>
     </div>
-    <div class="section-head"><h2>Bots</h2></div>
+    <div class="section-head"><h2>Bots</h2>${isManager()?'':'<span class="hint">view only</span>'}</div>
     <div class="bot-grid">${state.bots.map(botCard).join('')}</div>`;
-  app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>{mgrBot=c.dataset.bot;mgrDay=null;selectedIds.clear();addOpen=false;render();}));
+  if(isManager())app.querySelectorAll('[data-bot]').forEach(c=>c.addEventListener('click',()=>{mgrBot=c.dataset.bot;mgrDay=null;selectedIds.clear();addOpen=false;render();}));
 }
 function assigneeTag(name){return isFulltimeName(name)?'D.A':'FL';}
 function botCard(bot){
@@ -1753,7 +1756,8 @@ function botCard(bot){
     });
     const people=Object.keys(agg).sort((a,b)=>agg[b].pend-agg[a].pend||agg[b].done-agg[a].done||(a<b?-1:1));
     let inner=people.map(p=>{const g=agg[p];const complete=g.pend===0;
-      return `<div class="bc-p"><span class="bc-nm"><b class="bc-tag ${assigneeTag(p)==='D.A'?'da':'fl'}">${assigneeTag(p)}</b> ${esc(p)}</span><span class="bc-pn">${complete?`${g.done} <span class="bc-chk">✓</span>`:`${g.pend}`}</span></div>`;
+      const tot=g.done+g.pend;
+      return `<div class="bc-p"><span class="bc-nm"><b class="bc-tag ${assigneeTag(p)==='D.A'?'da':'fl'}">${assigneeTag(p)}</b> ${esc(p)}</span><span class="bc-pn ${complete?'':'bc-open'}">${g.done}/${tot}${complete?' <span class="bc-chk">✓</span>':''}</span></div>`;
     }).join('');
     if(freshCt>0)inner+=`<div class="bc-p"><span class="bc-nm"><b class="bc-tag new">NEW</b> Fresh</span><span class="bc-pn">${freshCt}</span></div>`;
     if(backlogCt>0)inner+=`<div class="bc-p bc-none"><span class="bc-nm">Unassigned</span><span class="bc-pn">${backlogCt}</span></div>`;
