@@ -665,6 +665,9 @@ async function healthCheck(){
   // 2. done episodes must carry a label date
   const noLabel=state.episodes.filter(e=>e.done&&!(e.dateLabeled||'').trim()).length;
   add('Data','Completed episodes have a date',noLabel?'FAIL':'OK',noLabel?noLabel+' missing date_labeled':'all labelled');
+  const badDate=state.episodes.filter(e=>(e.dateLabeled||'').trim()&&!/^\d{4}-\d{2}-\d{2}$/.test(e.dateLabeled));
+  add('Data','Date formats valid',badDate.length?'FAIL':'OK',
+      badDate.length?badDate.slice(0,3).map(e=>e.name+' = '+e.dateLabeled).join(' · '):'all YYYY-MM-DD');
 
   // 3. nobody assigned an episode that is already done+unassigned etc.
   const orphan=state.episodes.filter(e=>!e.done&&(e.assignee||'').trim()&&!isKnownWorker(e.assignee)).length;
@@ -1548,9 +1551,10 @@ function pcard(title,eps,hrs,ephv,accent){return `<div class="pcard" style="--pc
 function weeksBetween(a,b){const out=[];const pa=a.split('-').map(Number),pb=b.split('-').map(Number);let d=new Date(Date.UTC(pa[0],pa[1]-1,pa[2]));const stop=new Date(Date.UTC(pb[0],pb[1]-1,pb[2]));while(d<=stop){out.push(d.toISOString().slice(0,10));d.setUTCDate(d.getUTCDate()+7);}return out;}
 function dashSeries(day){
   const wk={};const mo={};
-  state.episodes.forEach(e=>{if(e.done&&e.dateLabeled){const mon=isoWeekRange(e.dateLabeled)[0];wk[mon]=(wk[mon]||0)+1;const m=e.dateLabeled.slice(0,7);mo[m]=(mo[m]||0)+1;}});
+  const OKDATE=/^\d{4}-\d{2}-\d{2}$/;   /* a single malformed date must not blank the charts */
+  state.episodes.forEach(e=>{if(e.done&&e.dateLabeled&&OKDATE.test(e.dateLabeled)){const mon=isoWeekRange(e.dateLabeled)[0];wk[mon]=(wk[mon]||0)+1;const m=e.dateLabeled.slice(0,7);mo[m]=(mo[m]||0)+1;}});
   const wkKeys=Object.keys(wk).sort();const curW=isoWeekRange(day)[0];
-  const weeks=wkKeys.length?weeksBetween(wkKeys[0],curW):[];
+  const weeks=wkKeys.length?weeksBetween(wkKeys[0]>curW?curW:wkKeys[0],curW).slice(-52):[];
   const W={labels:weeks.map(w=>'Wk'+isoWeekNum(w)),data:weeks.map(w=>wk[w]||0),colors:weeks.map(w=>w===curW?'rgba(76,175,80,.9)':'rgba(66,165,245,.7)')};
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const moKeys=Object.keys(mo).sort();
