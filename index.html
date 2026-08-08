@@ -1093,10 +1093,11 @@ function engineFail(e){const m=String((e&&e.message)||'');
 async function engineFillQueue(opts){
   if(!CLOUD||!session||!engineOk||isManager()||isQC())return;   /* QC accounts never receive episodes */
   const who=myAnnotatorName();if(!who)return;
-  if(!isFreelancer()&&!isOnClock(who))return;   /* full-timer must clock in before any assignment */
+  const bonusMode=!isFreelancer()&&!isOnClock(who);   /* clocked-out full-timer = bonus backlog */
+  if(bonusMode&&!(opts&&opts.requested))return;       /* only on explicit request */
   /* freelancer must explicitly request work — never auto-assigned on load/poll */
   if(isFreelancer()&&!(opts&&opts.requested))return;
-  const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||10);
+  const cap=(isFreelancer()||bonusMode)?(state.freelancerQueueSize||6):(state.queueSize||10);
   try{const rows=await sbRpc('fill_queue',{p_user:who,p_queue:cap});
     if(mergeEngineRows(rows)){toast('MY QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
     else if(opts&&opts.requested){toast(hasOpenWork(who)?'Finish your current tasks first':'No backlog available right now');}
@@ -1727,6 +1728,10 @@ function renderTimeLog(){
   }
   const tlf=app.querySelector('#tlFilterSel');if(tlf)tlf.addEventListener('change',e=>{tlFilter=e.target.value;tlShowAll=false;renderTimeLog();});
   const tlc=app.querySelector('#tlCollapse');if(tlc)tlc.addEventListener('click',()=>{tlShowAll=false;renderTimeLog();});
+  const bonusBtn=app.querySelector('#btnBonusTasks');
+  if(bonusBtn)bonusBtn.addEventListener('click',async()=>{bonusBtn.disabled=true;bonusBtn.textContent='Requesting…';
+    try{await engineFillQueue({requested:true});}catch(e){console.error('bonus request',e);}
+    render();});
   const tlAddBtn=app.querySelector('#tlAdd');if(tlAddBtn)tlAddBtn.addEventListener('click',addTimeEntry);
   const tdd=app.querySelector('#tlDedup');if(tdd)tdd.addEventListener('click',()=>{if(confirm('Remove exact duplicate time entries (same person, date, in and out)? One copy of each will be kept.'))removeDuplicateEntries();});
   const tcb=app.querySelector('#tlCsvBtn');const tcf=app.querySelector('#tlCsvFile');
@@ -2252,6 +2257,16 @@ function renderAnnotator(){
   keepTreeScroll('anno');
   const bots=state.bots.filter(b=>!botFilter||b===botFilter);
   app.innerHTML=`
+    ${(()=>{const who=(!isManager()&&!isFreelancer()&&!isQC())?myAnnotatorName():null;
+        if(!who||isOnClock(who))return '';
+        const open=state.episodes.filter(e=>e.assignee===who&&!e.done).length;
+        return `<div class="req-bar">
+          <button class="btn btn-req" id="btnBonusTasks" ${open>0?'disabled':''}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M12 5v14M5 12h14"/></svg>
+            I want tasks
+          </button>
+          <span class="req-hint">${open>0?`Finish your current ${open} task${open===1?'':'s'} first`:`Bonus backlog work · you are clocked out. Get ${state.freelancerQueueSize||6} backlog episodes.`}</span>
+        </div>`;})()}
     ${(!isManager()&&myAnnotatorName())?myQueueBar():''}
     <div class="tree-layout">
       <div class="tree-panel">
