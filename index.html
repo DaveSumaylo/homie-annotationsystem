@@ -659,7 +659,11 @@ async function healthCheck(){
     state.bots.forEach(b=>{const s=srvBotTotals&&srvBotTotals[b];if(!s)return;seen++;
       const loc=statsOf(episodesFor(b));
       if(loc.total!==+s.total||loc.done!==+s.done)bad++;});
-    add('Data','Bot totals match server',bad?'FAIL':'OK',bad?bad+' bot(s) differ':seen+' bots verified');
+    if(!_bgLoaded||_bgLoading){
+      add('Data','Bot totals match server','WARN','older episodes still loading — re-run in a moment');
+    }else{
+      add('Data','Bot totals match server',bad?'FAIL':'OK',bad?bad+' bot(s) differ':seen+' bots verified');
+    }
   }catch(e){add('Data','Bot totals match server','WARN','server totals unavailable');}
 
   // 2. done episodes must carry a label date
@@ -677,9 +681,17 @@ async function healthCheck(){
   const byPerson={};
   state.episodes.forEach(e=>{if(e.done||!(e.assignee||'').trim())return;
     (byPerson[e.assignee]=byPerson[e.assignee]||new Set()).add(e.bot);});
+  /* a split queue is EXPECTED when a bot ran dry mid-batch; only flag it when
+     one of their bots still has available work */
+  const avail={};
+  state.episodes.forEach(e=>{if(!e.done&&!(e.assignee||'').trim())avail[e.bot]=(avail[e.bot]||0)+1;});
   const split=Object.keys(byPerson).filter(p=>isFulltimeName(p)&&byPerson[p].size>1);
-  add('Assignment','Full-timers on one bot',split.length?'WARN':'OK',
-      split.length?split.map(p=>p+' ('+[...byPerson[p]].join(', ')+')').join(' · '):'no split queues');
+  /* legitimate spill leaves at least one bot empty; a split where EVERY bot
+     still has work means the batch scattered without cause */
+  const badSplit=split.filter(p=>[...byPerson[p]].every(b=>(avail[b]||0)>0));
+  add('Assignment','Full-timers on one bot',badSplit.length?'WARN':'OK',
+      badSplit.length?badSplit.map(p=>p+' ('+[...byPerson[p]].join(', ')+')').join(' · ')
+        :(split.length?split.length+' split after a bot ran dry (expected)':'no split queues'));
 
   // 5. clocked-in full-timers should hold work if fresh exists
   const freshLeft=state.episodes.filter(e=>!e.done&&!(e.assignee||'').trim()&&e.isNew).length;
@@ -935,15 +947,16 @@ function mergeLoadedRows(rows){
   return added;
 }
 /* load anything older than the window, quietly, after the app is usable */
-let _bgLoaded=false;
+let _bgLoaded=false,_bgLoading=false;
 async function backgroundLoadOlder(){
-  if(_bgLoaded||!CLOUD||!session)return; _bgLoaded=true;
+  if(_bgLoaded||_bgLoading||!CLOUD||!session)return; _bgLoading=true;
   try{
     const rows=await cloudLoadRange('0000-01-01',windowStartISO());
     const n=mergeLoadedRows(rows);
     if(n){persistLocal();if(!isTypingNow())render();}
+    _bgLoaded=true;_bgLoading=false;
     console.log('%c[Project Homie] older episodes loaded in background','color:#10a874','+'+n.toLocaleString());
-  }catch(e){console.warn('background load failed',e);_bgLoaded=false;}
+  }catch(e){console.warn('background load failed',e);_bgLoaded=false;_bgLoading=false;}
 }
 async function cloudLoadAll(){const _t0=Date.now();let _reqs=0;const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudLoadMeta(){try{const r=await sbFetch('app_meta?id=eq.1&select=data',{headers:sbHeaders()});const j=await r.json();return (j[0]&&j[0].data)||null;}catch(e){return null;}}
