@@ -647,6 +647,65 @@ function episodesFor(bot){return state.episodes.filter(e=>e.bot===bot);}
 function dayOf(e){return state.dayOverrides[e.id]||dateFromName(e.name);}
 function dayEpisodes(bot,day){return episodesFor(bot).filter(e=>dayOf(e)===day).sort((a,b)=>a.name<b.name?-1:1);}
 let srvBotTotals=null, srvPersonTotals=null, srvTotalsAt=0;
+/* ---------- system health check: run healthCheck() in the console ---------- */
+async function healthCheck(){
+  const out=[];const add=(area,check,status,detail)=>out.push({area,check,status,detail});
+  const today=todayISO();
+
+  // 1. totals: local vs server
+  try{
+    await refreshServerTotals(true);
+    let bad=0,seen=0;
+    state.bots.forEach(b=>{const s=srvBotTotals&&srvBotTotals[b];if(!s)return;seen++;
+      const loc=statsOf(episodesFor(b));
+      if(loc.total!==+s.total||loc.done!==+s.done)bad++;});
+    add('Data','Bot totals match server',bad?'FAIL':'OK',bad?bad+' bot(s) differ':seen+' bots verified');
+  }catch(e){add('Data','Bot totals match server','WARN','server totals unavailable');}
+
+  // 2. done episodes must carry a label date
+  const noLabel=state.episodes.filter(e=>e.done&&!(e.dateLabeled||'').trim()).length;
+  add('Data','Completed episodes have a date',noLabel?'FAIL':'OK',noLabel?noLabel+' missing date_labeled':'all labelled');
+
+  // 3. nobody assigned an episode that is already done+unassigned etc.
+  const orphan=state.episodes.filter(e=>!e.done&&(e.assignee||'').trim()&&!isKnownWorker(e.assignee)).length;
+  add('Roster','Assignees exist in roster',orphan?'WARN':'OK',orphan?orphan+' episode(s) assigned to unknown names':'all known');
+
+  // 4. one bot per person (full-timers)
+  const byPerson={};
+  state.episodes.forEach(e=>{if(e.done||!(e.assignee||'').trim())return;
+    (byPerson[e.assignee]=byPerson[e.assignee]||new Set()).add(e.bot);});
+  const split=Object.keys(byPerson).filter(p=>isFulltimeName(p)&&byPerson[p].size>1);
+  add('Assignment','Full-timers on one bot',split.length?'WARN':'OK',
+      split.length?split.map(p=>p+' ('+[...byPerson[p]].join(', ')+')').join(' · '):'no split queues');
+
+  // 5. clocked-in full-timers should hold work if fresh exists
+  const freshLeft=state.episodes.filter(e=>!e.done&&!(e.assignee||'').trim()&&e.isNew).length;
+  const idle=fulltimeNames().filter(p=>isOnClock(p)&&!state.episodes.some(e=>e.assignee===p&&!e.done));
+  add('Assignment','Clocked-in staff have work',
+      (idle.length&&freshLeft)?'WARN':'OK',
+      idle.length?idle.join(', ')+' idle · '+freshLeft+' fresh available':'none idle');
+
+  // 6. stale shifts
+  const stale=state.timeEntries.filter(t=>t.start&&!t.end&&t.day<today);
+  add('Time log','No shifts left open from earlier days',stale.length?'FAIL':'OK',
+      stale.length?stale.map(t=>t.person+' ('+t.day+')').join(', '):'clean');
+
+  // 7. duplicate open shifts for the same person
+  const openBy={};state.timeEntries.forEach(t=>{if(t.start&&!t.end)openBy[t.person]=(openBy[t.person]||0)+1;});
+  const dupes=Object.keys(openBy).filter(p=>openBy[p]>1);
+  add('Time log','One open shift per person',dupes.length?'FAIL':'OK',dupes.length?dupes.join(', '):'ok');
+
+  // 8. sync health
+  const pend=state.episodes.filter(e=>epSig(e)!==syncedEps.get(e.id)).length;
+  add('Sync','No unsynced episode edits',pend>25?'WARN':'OK',pend?pend+' pending':'all synced');
+  add('Sync','Episodes loaded','OK',state.episodes.length.toLocaleString()+' in memory');
+
+  console.table(out);
+  const fails=out.filter(r=>r.status==='FAIL').length, warns=out.filter(r=>r.status==='WARN').length;
+  console.log('%c'+(fails?fails+' FAIL':'')+(fails&&warns?' · ':'')+(warns?warns+' WARN':'')+(!fails&&!warns?'All checks passed':''),
+    fails?'color:#f87171;font-weight:bold':(warns?'color:#f59e0b;font-weight:bold':'color:#10a874;font-weight:bold'));
+  return out;
+}
 function verifyTotals(){
   if(!srvBotTotals){console.warn('server totals not loaded yet');return;}
   const rows=[];let bad=0;
