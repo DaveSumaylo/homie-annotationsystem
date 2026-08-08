@@ -473,6 +473,7 @@
   .myq{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--acc-line);border-radius:12px;padding:10px 14px;margin-bottom:14px}
   .myq-t{font-weight:800;font-size:12px;color:var(--acc);letter-spacing:.5px}
   .myq-n{font-size:11px;font-weight:800;color:var(--acc);background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:14px;padding:2px 9px}
+  .myq-chip.chip-done{opacity:.55;text-decoration:line-through}
   .myq-chip{font-size:11px;font-variant-numeric:tabular-nums;text-transform:none;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:16px;padding:4px 10px;color:var(--ink);transition:.12s}
   .myq-chip:hover{border-color:var(--acc);color:var(--acc)}
   .myq-empty{font-size:12px;color:var(--ink-soft)}
@@ -881,13 +882,13 @@ function applyRole(){
   if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
-  const tdash=document.getElementById('tabDashboard');if(tdash)tdash.style.display=isFreelancer()?'none':'';
+  const tdash=document.getElementById('tabDashboard');if(tdash)tdash.style.display='';
   if(!(isManager()||isFreelancer())&&mode==='backlog'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
-  if(isFreelancer()&&mode!=='backlog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}  /* freelancer: backlog-only workspace */
+  if(isFreelancer()&&!['backlog','dashboard'].includes(mode)){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
   if(!(isManager()||isFullTimeUser())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
-  if(isFreelancer()&&mode==='timelog'){mode='annotator';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(isFreelancer()&&mode==='timelog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isQC()){   /* QC: QC tab + Dashboard + Time Log (clock in/out for records) */
     ['tabEpisodes','tabBacklog','tabManager','btnSettings'].forEach(function(id){
       const el=document.getElementById(id);if(el)el.style.display='none';});
@@ -1804,10 +1805,6 @@ function renderTimeLog(){
   }
   const tlf=app.querySelector('#tlFilterSel');if(tlf)tlf.addEventListener('change',e=>{tlFilter=e.target.value;tlShowAll=false;renderTimeLog();});
   const tlc=app.querySelector('#tlCollapse');if(tlc)tlc.addEventListener('click',()=>{tlShowAll=false;renderTimeLog();});
-  const bonusBtn=app.querySelector('#btnBonusTasks');
-  if(bonusBtn)bonusBtn.addEventListener('click',async()=>{bonusBtn.disabled=true;bonusBtn.textContent='Requesting…';
-    try{await engineFillQueue({requested:true});}catch(e){console.error('bonus request',e);}
-    render();});
   const tlAddBtn=app.querySelector('#tlAdd');if(tlAddBtn)tlAddBtn.addEventListener('click',addTimeEntry);
   const tdd=app.querySelector('#tlDedup');if(tdd)tdd.addEventListener('click',()=>{if(confirm('Remove exact duplicate time entries (same person, date, in and out)? One copy of each will be kept.'))removeDuplicateEntries();});
   const tcb=app.querySelector('#tlCsvBtn');const tcf=app.querySelector('#tlCsvFile');
@@ -1845,7 +1842,7 @@ function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
 function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
 function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
 function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
-function render(){ if(isQC()&&!['qc','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='annotator'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else renderAnnotator(); }
+function render(){ if(isQC()&&!['qc','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
@@ -2088,11 +2085,14 @@ function backlogDetail(bot,day){
     if(!clicked) return `<div class="empty-state"><h3>Nothing to show</h3><p>Pick an episode from your queue.</p></div>`;
     const who=myAnnotatorName();
     const b=clicked.bot, d=dayOf(clicked);
-    const eps=state.episodes.filter(x=>x.bot===b&&dayOf(x)===d&&x.assignee===who&&!x.done).sort((a,b)=>a.name<b.name?-1:1);
-    if(!eps.length) return `<div class="empty-state"><h3>Done 🎉</h3><p>All your ${esc(b)} episodes for this day are complete. Pick another from your queue.</p></div>`;
+    const mineAll=state.episodes.filter(x=>x.assignee===who);
+    const batchOpen=mineAll.some(x=>!x.done);
+    const eps=mineAll.filter(x=>x.bot===b&&dayOf(x)===d&&(batchOpen||!x.done)).sort((a,b)=>a.name<b.name?-1:1);
+    const doneN=eps.filter(x=>x.done).length;
+    if(!eps.length) return `<div class="empty-state"><h3>Nothing here</h3><p>No episodes for this bot and date.</p></div>`;
     return `<div class="detail-head"><span class="dh-emoji">${botIcon(b)}</span>
       <div><div class="dh-title">${esc(b)}</div><div class="dh-sub">${prettyDate(d)} · my queue</div></div>
-      <div class="dh-prog"><span class="dh-frac">${eps.length} episode${eps.length===1?'':'s'}</span></div></div>
+      <div class="dh-prog"><span class="dh-frac">${doneN}/${eps.length} done</span></div></div>
     <div class="gscroll ${isManager()?'':'ro-view'}"><div class="ginner">
       <div class="gcols"><div></div><div>Episode name</div><div>Task code</div><div>Assignee</div><div>Date labeled</div><div>Done</div><div></div></div>
       ${eps.map(gridRow).join('')}
@@ -2353,6 +2353,10 @@ function renderAnnotator(){
     </div>`;
   restoreTreeScroll('anno');
   app.querySelector('#botFilter').addEventListener('change',e=>{botFilter=e.target.value;sel={bot:null,day:null};selectedIds.clear();renderAnnotator();});
+  const bonusBtn=app.querySelector('#btnBonusTasks');
+  if(bonusBtn)bonusBtn.addEventListener('click',async()=>{bonusBtn.disabled=true;bonusBtn.textContent='Requesting…';
+    try{await engineFillQueue({requested:true});}catch(e){console.error('bonus request',e);}
+    render();});
   app.querySelectorAll('[data-tbot]').forEach(el=>el.addEventListener('click',()=>{const b=el.dataset.tbot;botOpen(b)?collapsedBots.add(b):collapsedBots.delete(b);renderAnnotator();}));
   app.querySelectorAll('[data-tmonth]').forEach(el=>el.addEventListener('click',()=>{const [b,m]=el.dataset.tmonth.split('|');const k=b+'|'+m;openMonths.has(k)?openMonths.delete(k):openMonths.add(k);renderAnnotator();}));
   app.querySelectorAll('[data-tday]').forEach(el=>el.addEventListener('click',()=>{const [b,d]=el.dataset.tday.split('|');sel={bot:b,day:d};selectedIds.clear();addOpen=false;renderAnnotator();}));
@@ -2361,9 +2365,14 @@ function renderAnnotator(){
 }
 function myQueueBar(){
   const who=myAnnotatorName();const cap=isFreelancer()?(state.freelancerQueueSize||6):(state.queueSize||10);
-  const q=state.episodes.filter(e=>e.assignee===who&&!e.done).sort((a,b)=>a.name<b.name?-1:1);
-  return `<div class="myq"><span class="myq-t">My Queue${isFreelancer()?' · Backlog':''}</span><span class="myq-n">${q.length}/${cap}</span>
-    ${q.length?q.slice(0,12).map(e=>`<button class="myq-chip" data-q="${e.id}" title="${esc(e.bot)} · ${esc(e.name)}">${esc(e.name.replace('episode_',''))}</button>`).join('')
+  const mine=state.episodes.filter(e=>e.assignee===who).sort((a,b)=>a.name<b.name?-1:1);
+  const openN=mine.filter(e=>!e.done).length;
+  /* while a batch is in progress show ALL of it (done + pending) so nothing
+     vanishes on tick; when every episode is done the bar clears for the next batch */
+  const q=openN>0?mine:[];
+  const doneN=q.filter(e=>e.done).length;
+  return `<div class="myq"><span class="myq-t">My Queue${isFreelancer()?' · Backlog':''}</span><span class="myq-n">${doneN}/${q.length} done</span>
+    ${q.length?q.slice(0,12).map(e=>`<button class="myq-chip ${e.done?'chip-done':''}" data-q="${e.id}" title="${esc(e.bot)} · ${esc(e.name)}">${e.done?'✓ ':''}${esc(e.name.replace('episode_',''))}</button>`).join('')
       :`<span class="myq-empty">No waiting episodes — all caught up 🎉</span>`}
   </div>`;
 }
