@@ -397,6 +397,7 @@
   .an-hrs{color:#60a5fa;font-weight:700}
   .an-eph{color:#fbbf24;font-weight:800}
   .an-zero{color:var(--ink-faint);font-weight:600}
+  .bonus-v.bl-v{color:var(--amber)}
   .bonus-v{font-size:26px;font-weight:800;color:var(--acc);padding:6px 4px 0;font-variant-numeric:tabular-nums}
   .bonus-s{font-size:10px;color:var(--ink-faint);padding:0 4px 4px}
   .bulkbar .bb-date{display:inline-flex;align-items:center;gap:4px}
@@ -871,6 +872,15 @@ function fulltimeNames(){
   return fromMap.length?fromMap:FULLTIME_FALLBACK.slice();   // fallback until roster loads
 }
 function isFreelancerName(name){return nameRole(name)==='freelancer';}
+/* People who changed role: only count their work from this date onward in the
+   freelancer figures. Anything earlier belongs to their previous role. */
+const ROLE_SINCE={'Mark':'2026-07-01'};
+function countsAsFreelancerWork(e){
+  if(!isFreelancerName(e.assignee))return false;
+  const since=ROLE_SINCE[(e.assignee||'').trim()];
+  if(!since)return true;
+  return !!e.dateLabeled && e.dateLabeled >= since;
+}
 function isManager(){return me.role==='manager';}
 function isFreelancer(){return me.role==='freelancer';}
 function isQC(){return me.role==='qc';}
@@ -1574,11 +1584,15 @@ function dashSeries(day){
   const wk={};const mo={};
   const OKDATE=/^\d{4}-\d{2}-\d{2}$/;   /* a single malformed date must not blank the charts */
   state.episodes.forEach(e=>{if(e.done&&e.dateLabeled&&OKDATE.test(e.dateLabeled)){const mon=isoWeekRange(e.dateLabeled)[0];wk[mon]=(wk[mon]||0)+1;const m=e.dateLabeled.slice(0,7);mo[m]=(mo[m]||0)+1;}});
-  const wkKeys=Object.keys(wk).sort();const curW=isoWeekRange(day)[0];
-  const weeks=wkKeys.length?weeksBetween(wkKeys[0]>curW?curW:wkKeys[0],curW).slice(-52):[];
+  const YR=day.slice(0,4);                       /* charts show the current year only */
+  const wkKeys=Object.keys(wk).filter(k=>k.slice(0,4)===YR).sort();
+  const curW=isoWeekRange(day)[0];
+  const yrStart=isoWeekRange(YR+'-01-01')[0];
+  const firstW=wkKeys.length?(wkKeys[0]<yrStart?yrStart:wkKeys[0]):yrStart;
+  const weeks=weeksBetween(firstW>curW?curW:firstW,curW);
   const W={labels:weeks.map(w=>'Wk'+isoWeekNum(w)),data:weeks.map(w=>wk[w]||0),colors:weeks.map(w=>w===curW?'rgba(76,175,80,.9)':'rgba(66,165,245,.7)')};
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const moKeys=Object.keys(mo).sort();
+  const moKeys=Object.keys(mo).filter(k=>k.slice(0,4)===YR).sort();
   const M={labels:moKeys.map(k=>MN[+k.slice(5,7)-1]),data:moKeys.map(k=>mo[k]),colors:moKeys.map((k,i)=>COLORS[i%COLORS.length]),keys:moKeys};
   return {W,M};
 }
@@ -1592,6 +1606,14 @@ function renderDashboard(){
   const mEps=epDoneMonth(day).length,mHrs=hoursOn(d=>inMonth(d,day)),mEph=eph(mEps,mHrs);
   const aEps=epDoneAll().length,aHrs=hoursAll(),aEph=eph(aEps,aHrs);
   const bD=bonusTotal('day',day),bW=bonusTotal('week',day),bM=bonusTotal('month',day),bA=bonusTotal('all',day);
+  /* backlog COMPLETED by freelancers, by the date the work was finished */
+  const isFlDone=e=>e.done&&countsAsFreelancerWork(e);
+  const blD=state.episodes.filter(e=>isFlDone(e)&&e.dateLabeled===day).length;
+  const blW=state.episodes.filter(e=>isFlDone(e)&&e.dateLabeled&&inWeek(e.dateLabeled,day)).length;
+  const blM=state.episodes.filter(e=>isFlDone(e)&&e.dateLabeled&&inMonth(e.dateLabeled,day)).length;
+  const blA=state.episodes.filter(isFlDone).length;
+  /* how much is still sitting unclaimed right now */
+  const blWaiting=state.episodes.filter(e=>!e.done&&!e.isNew&&!(e.assignee||'').trim()).length;
   const ftNames=fulltimeNames().slice().sort();
   const flNames=freelancerNames();
   const kpi=fulltimeNames().map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d).slice(0,10);
@@ -1620,6 +1642,12 @@ function renderDashboard(){
      <div class="pp"><div class="pt2">KPI bonus · weekly <span class="pth2">· ${wr[0].slice(5)} – ${wr[1].slice(5)}</span></div><div class="bonus-v">${bW.toLocaleString()}</div><div class="bonus-s">Mon–Sun</div></div>
      <div class="pp"><div class="pt2">KPI bonus · monthly <span class="pth2">· ${day.slice(0,7)}</span></div><div class="bonus-v">${bM.toLocaleString()}</div><div class="bonus-s">this month</div></div>
      <div class="pp"><div class="pt2">KPI bonus · all time</div><div class="bonus-v">${bA.toLocaleString()}</div><div class="bonus-s">total bonus episodes</div></div>
+   </div>
+   <div class="trio">
+     <div class="pp"><div class="pt2">Backlog done · daily <span class="pth2">· ${prettyDate(day)}</span></div><div class="bonus-v bl-v">${blD.toLocaleString()}</div><div class="bonus-s">completed by freelancers</div></div>
+     <div class="pp"><div class="pt2">Backlog done · weekly <span class="pth2">· ${wr[0].slice(5)} – ${wr[1].slice(5)}</span></div><div class="bonus-v bl-v">${blW.toLocaleString()}</div><div class="bonus-s">Mon–Sun</div></div>
+     <div class="pp"><div class="pt2">Backlog done · monthly <span class="pth2">· ${day.slice(0,7)}</span></div><div class="bonus-v bl-v">${blM.toLocaleString()}</div><div class="bonus-s">this month</div></div>
+     <div class="pp"><div class="pt2">Backlog done · all time</div><div class="bonus-v bl-v">${blA.toLocaleString()}</div><div class="bonus-s">${blWaiting.toLocaleString()} still waiting in the pool</div></div>
    </div>
    <div class="dash-main">
      <div class="dash-left">
