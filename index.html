@@ -656,14 +656,16 @@ async function healthCheck(){
   // 1. totals: local vs server
   try{
     await refreshServerTotals(true);
-    let bad=0,seen=0;
+    let bad=0,seen=0;const diffs=[];
     state.bots.forEach(b=>{const s=srvBotTotals&&srvBotTotals[b];if(!s)return;seen++;
       const loc=statsOf(episodesFor(b));
-      if(loc.total!==+s.total||loc.done!==+s.done)bad++;});
+      if(loc.total!==+s.total||loc.done!==+s.done){bad++;
+        diffs.push(b+': local '+loc.total+'/'+loc.done+' vs server '+(+s.total)+'/'+(+s.done));}});
     if(!_bgLoaded||_bgLoading){
       add('Data','Bot totals match server','WARN','older episodes still loading — re-run in a moment');
     }else{
-      add('Data','Bot totals match server',bad?'FAIL':'OK',bad?bad+' bot(s) differ':seen+' bots verified');
+      add('Data','Bot totals match server',bad?'FAIL':'OK',
+          bad?diffs.join(' · ')+'  (totals cache refreshes each minute — re-run to confirm)':seen+' bots verified');
     }
   }catch(e){add('Data','Bot totals match server','WARN','server totals unavailable');}
 
