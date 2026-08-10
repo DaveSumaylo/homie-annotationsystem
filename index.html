@@ -917,7 +917,7 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Supabase '+r.status+' '+t.slice(0,160));}return r;}
 
 function epToRow(e){return {id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done,qc_name:e.qcName||null,qc_date:e.qcDate||null,qc_checked:!!e.qcChecked,qc_comment:e.qcComment||null,qc_errors:e.qcErrors||[]};}
-function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),qcName:r.qc_name||'',qcDate:r.qc_date||'',qcChecked:!!r.qc_checked,qcComment:r.qc_comment||'',qcErrors:Array.isArray(r.qc_errors)?r.qc_errors:[],createdAt:Date.now()};}
+function rowToEp(r){return {id:r.id,bot:r.bot,name:r.name,taskCode:r.task_code||'',assignee:r.assignee||'',dateLabeled:r.date_labeled||'',done:!!r.done,isNew:(r.is_new===true),qcName:r.qc_name||'',qcDate:r.qc_date||'',qcChecked:!!r.qc_checked,qcComment:r.qc_comment||'',qcErrors:Array.isArray(r.qc_errors)?r.qc_errors:[],status:(r.status||''),createdAt:Date.now()};}
 function epSig(e){return e.bot+'|'+e.name+'|'+(e.taskCode||'')+'|'+(e.assignee||'')+'|'+(e.dateLabeled||'')+'|'+(e.done?1:0)+'|'+(e.qcName||'')+'|'+(e.qcDate||'')+'|'+(e.qcChecked?1:0)+'|'+(e.qcComment||'')+'|'+JSON.stringify(e.qcErrors||[]);}
 function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annotators,taskCodes:state.taskCodes,assignments:state.assignments,dayOverrides:state.dayOverrides,queueSize:state.queueSize||10,freelancerQueueSize:state.freelancerQueueSize||6,batchSize:state.batchSize||5,listsVersion:state.listsVersion||0});}
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
@@ -1143,6 +1143,7 @@ async function cloudPoll(){
             /* is_new is server-owned and not part of epSig — adopt it always,
                otherwise a fresh→backlog flip (no assignee change) is never seen */
             if(cur.isNew!==inc.isNew){cur.isNew=inc.isNew;dirty=true;}
+            if(cur.status!==inc.status){cur.status=inc.status;dirty=true;}
             syncedEps.set(inc.id,epSig(inc));}
         }
       }
@@ -2103,7 +2104,12 @@ function wireDetail(bot,getDay,rerender){
 }
 
 /* ---------- Backlog tab (freelancers): pending episodes grouped by bot ---------- */
-function blEpisodesFor(bot){return episodesFor(bot).filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())&&!e.isNew);}  /* true backlog only: unfinished, unassigned, and NOT fresh (is_new) — fresh belongs to full-timers */
+function blEpisodesFor(bot){
+  /* Backlog = exactly what fill_queue hands to freelancers: status 'backlog'.
+     is_new is NOT a reliable signal — an episode that was assigned then cleared
+     has is_new=false but returns to 'waiting' (the full-timer pool). */
+  return episodesFor(bot).filter(e=>!e.done&&!(e.assignee&&e.assignee.trim())&&e.status==='backlog');
+}
 function blDaysOf(bot){return [...new Set(blEpisodesFor(bot).map(dayOf))].sort((a,b)=>a<b?1:-1);}  /* newest first */
 function blMonthsOf(bot){return [...new Set(blDaysOf(bot).map(d=>d==='Undated'?'Undated':d.slice(0,7)))].sort((a,b)=>a<b?1:-1);}
 function blDaysInMonth(bot,m){return blDaysOf(bot).filter(d=>(d==='Undated'?'Undated':d.slice(0,7))===m);}
