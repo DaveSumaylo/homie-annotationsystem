@@ -1118,7 +1118,18 @@ async function cloudPoll(){
     }catch(e){console.error('poll meta',e);}
     // episodes: incremental by updated_at, then count check for deletions
     try{
-      const r=await sbFetch('episodes?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(epWatermark||'1970-01-01'),{headers:sbHeaders()});
+      /* page through bulk changes so a large update (e.g. a QC import) is picked
+         up in one cycle instead of 1000 rows at a time */
+      let _acc=[],_guard=0,_wm=epWatermark||'1970-01-01';
+      while(_guard++<12){
+        const rr=await sbFetch('episodes?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(_wm),{headers:sbHeaders()});
+        const batch=await rr.json();
+        if(!Array.isArray(batch)||!batch.length)break;
+        _acc=_acc.concat(batch);
+        _wm=batch[batch.length-1].updated_at||_wm;
+        if(batch.length<1000)break;
+      }
+      const r={json:async()=>_acc};
       const rows=await r.json();
       if(rows.length){
         epWatermark=maxWm(rows,epWatermark);
