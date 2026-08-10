@@ -955,8 +955,8 @@ function applyRole(){
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
-  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC())?'':'none';
-  if(!(isManager()||isQC())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC()||isFullTimeUser())?'':'none';
+  if(!(isManager()||isQC()||isFullTimeUser())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
