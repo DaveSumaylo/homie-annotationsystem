@@ -400,6 +400,16 @@
   .bonus-v.bl-v{color:var(--amber)}
   .bonus-v{font-size:26px;font-weight:800;color:var(--acc);padding:6px 4px 0;font-variant-numeric:tabular-nums}
   .bonus-s{font-size:10px;color:var(--ink-faint);padding:0 4px 4px}
+  .pg.pg4{grid-template-columns:repeat(4,1fr)}
+  .pg.pg4 .psv{font-size:15px}
+  .pg.pg4 .psl{font-size:8.5px}
+  .qa-rk{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid var(--border);font-size:11.5px}
+  .qa-rk:last-child{border-bottom:none}
+  .qa-pos{width:16px;height:16px;border-radius:50%;background:var(--surface-3);color:var(--ink-faint);
+    font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .qa-nm{font-weight:700;text-transform:none;flex:1}
+  .qa-val{font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
+  .qa-val i{font-style:normal;font-weight:600;color:var(--ink-faint);font-size:10px}
   .bulkbar .bb-date{display:inline-flex;align-items:center;gap:4px}
   .bulkbar .btn-danger{background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.45)}
   .bb-n{font-size:12px;font-weight:800;color:var(--acc);margin-right:4px}
@@ -535,6 +545,7 @@
       <button data-mode="dashboard" id="tabDashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
       <button data-mode="manager" id="tabManager" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Production</button>
       <button data-mode="annotator" id="tabEpisodes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Episodes</button>
+      <button id="tabQcAn" data-mode="qcan" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 4-6"/></svg>QC Analytics</button>
       <button id="tabQc" data-mode="qc" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>QC</button>
       <button id="tabBacklog" data-mode="backlog" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>Backlog</button>
       <button id="tabTimelog" data-mode="timelog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time Log</button>
@@ -609,7 +620,7 @@ if(!Array.isArray(state.timeEntries))state.timeEntries=[];
 if(typeof state.batchSize!=='number')state.batchSize=5;
 if(typeof state.listsVersion!=='number')state.listsVersion=0;
 if(typeof state.queueSize!=='number')state.queueSize=10;
-let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog','qc'].includes(m)?m:'dashboard';})();
+let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog','qc','qcan'].includes(m)?m:'dashboard';})();
 let openBot=null;
 const drawerOpen=new Set();       // manager drawer date groups that are EXPANDED (default collapsed)
 const drawerMonthOpen=new Set();  // manager drawer month groups EXPANDED (default collapsed)
@@ -693,6 +704,28 @@ async function healthCheck(){
   /* legitimate spill leaves at least one bot empty; a split where EVERY bot
      still has work means the batch scattered without cause */
   const badSplit=split.filter(p=>[...byPerson[p]].every(b=>(avail[b]||0)>0));
+
+  /* RULE: finish the current bot before moving on. Flag anyone working a bot
+     while a DIFFERENT bot they were on more recently still has waiting work. */
+  const lastBot={};
+  state.episodes.forEach(e=>{
+    if(!(e.assignee||'').trim())return;
+    const k=e.assignee, t=e.dateLabeled||'';
+    if(!lastBot[k]||t>lastBot[k].t)lastBot[k]={bot:e.bot,t:t};
+  });
+  const stranded=[];
+  Object.keys(byPerson).forEach(p=>{
+    if(!isFulltimeName(p))return;
+    const onBots=[...byPerson[p]];
+    Object.keys(avail).forEach(b=>{
+      if(onBots.includes(b))return;
+      if((avail[b]||0)===0)return;
+      const prev=state.episodes.some(e=>e.assignee===p&&e.bot===b);
+      if(prev)stranded.push(p+' on '+onBots.join('/')+' but '+b+' has '+avail[b]+' left');
+    });
+  });
+  add('Assignment','Bots finished before moving on',stranded.length?'WARN':'OK',
+      stranded.length?stranded.slice(0,3).join(' · '):'no bot left part-done');
   add('Assignment','Full-timers on one bot',badSplit.length?'WARN':'OK',
       badSplit.length?badSplit.map(p=>p+' ('+[...byPerson[p]].join(', ')+')').join(' · ')
         :(split.length?split.length+' split after a bot ran dry (expected)':'no split queues'));
@@ -891,6 +924,8 @@ function applyRole(){
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
+  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC())?'':'none';
+  if(!(isManager()||isQC())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
@@ -906,7 +941,7 @@ function applyRole(){
       const el=document.getElementById(id);if(el)el.style.display='none';});
     ['tabQc','tabDashboard','tabTimelog'].forEach(function(id){
       const el=document.getElementById(id);if(el)el.style.display='';});
-    if(!['qc','dashboard','timelog'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
+    if(!['qc','qcan','dashboard','timelog'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
   }
   document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));
 }
@@ -1889,7 +1924,7 @@ function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
 function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
 function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
 function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
-function render(){ if(isQC()&&!['qc','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else renderAnnotator(); }
+function render(){ if(isQC()&&!['qc','qcan','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
@@ -2378,6 +2413,168 @@ function renderQC(){
   app.querySelectorAll('[data-qcdelcode]').forEach(el=>el.addEventListener('click',()=>{
     const [id,i,ci]=el.dataset.qcdelcode.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
     e.qcErrors[+i].codes.splice(+ci,1);qcAutoComment(e);qcSave();renderQC();}));
+}
+
+/* ---------- QC Analytics (manager + QC) ---------- */
+function qcDay(e){                     /* period key = when QC checked it */
+  if(!e.qcDate)return '';
+  const d=String(e.qcDate);
+  return d.length>=10?d.slice(0,10):'';
+}
+function qcHasError(e){return qcErrCount(e)>0;}
+function qcReviewedFT(){               /* full-timers only, everywhere */
+  return state.episodes.filter(e=>e.done&&e.qcChecked&&isFulltimeName(e.assignee));
+}
+function qcInScope(list,scope,day){
+  if(scope==='all')return list;
+  return list.filter(e=>{const d=qcDay(e);if(!d)return false;
+    if(scope==='day')return d===day;
+    if(scope==='week')return inWeek(d,day);
+    if(scope==='month')return inMonth(d,day);
+    return false;});
+}
+function qcRate(rev,err){return rev?Math.round(err/rev*1000)/10:0;}
+
+function qcCoverage(scope,day){
+  /* A DATE counts as reviewed when it has ANY QC record on it. */
+  const done=state.episodes.filter(e=>e.done&&isFulltimeName(e.assignee)&&e.dateLabeled);
+  const inScope=done.filter(e=>{
+    if(scope==='all')return true;
+    if(scope==='day')return e.dateLabeled===day;
+    if(scope==='week')return inWeek(e.dateLabeled,day);
+    if(scope==='month')return inMonth(e.dateLabeled,day);
+    return false;});
+  const rev=inScope.filter(e=>e.qcChecked).length;
+  const dates=[...new Set(inScope.map(e=>e.dateLabeled))];
+  const datesRev=[...new Set(inScope.filter(e=>e.qcChecked).map(e=>e.dateLabeled))];
+  return {episodes:inScope.length, reviewed:rev, unreviewed:inScope.length-rev,
+          pct:inScope.length?Math.round(rev/inScope.length*1000)/10:0,
+          dates:dates.length, datesReviewed:datesRev.length};
+}
+
+function qcBotDates(scope,day){
+  /* counts BOT+DATE combinations, so Alpha 08-05 and Charlie 08-05 are two.
+     A bot-date counts as reviewed when it has ANY QC record. */
+  const done=state.episodes.filter(e=>e.done&&isFulltimeName(e.assignee)&&e.dateLabeled&&(
+    scope==='all'||
+    (scope==='day'&&e.dateLabeled===day)||
+    (scope==='week'&&inWeek(e.dateLabeled,day))||
+    (scope==='month'&&inMonth(e.dateLabeled,day))));
+  const total=new Set(), reviewed=new Set(), perBot={};
+  done.forEach(e=>{
+    const k=e.bot+'|'+e.dateLabeled;
+    total.add(k);
+    (perBot[e.bot]=perBot[e.bot]||{tot:new Set(),rev:new Set()}).tot.add(e.dateLabeled);
+    if(e.qcChecked){reviewed.add(k);perBot[e.bot].rev.add(e.dateLabeled);}
+  });
+  return {total:total.size, reviewed:reviewed.size,
+          unreviewed:total.size-reviewed.size,
+          pct:total.size?Math.round(reviewed.size/total.size*1000)/10:0,
+          perBot:Object.keys(perBot).sort().map(b=>({bot:b,rev:perBot[b].rev.size,tot:perBot[b].tot.size}))};
+}
+function qcPerPerson(){
+  const out={};
+  qcReviewedFT().forEach(e=>{
+    const p=e.assignee;const o=out[p]||(out[p]={rev:0,err:0});
+    o.rev++; if(qcHasError(e))o.err++;
+  });
+  return Object.keys(out).map(p=>({p,rev:out[p].rev,err:out[p].err,
+    rate:qcRate(out[p].rev,out[p].err)}));
+}
+function qcEphPerPerson(){
+  return fulltimeNames().map(p=>{
+    const eps=personEpisodes(p,'all'), hrs=personHours(p,'all');
+    return {p,eps,hrs,eph:eph(eps,hrs)};
+  }).filter(x=>x.hrs>0&&x.eps>0);
+}
+
+function renderQCAnalytics(){
+  const day=dashDate;
+  const all=qcReviewedFT();
+  const tot=all.length, totErr=all.filter(qcHasError).length;
+  const totCodes=all.reduce((s,e)=>s+qcErrCount(e),0);
+  const wr=isoWeekRange(day);
+  const per=s=>{const l=qcInScope(all,s,day);const e=l.filter(qcHasError).length;
+                return {rev:l.length,err:e,rate:qcRate(l.length,e)};};
+  const D=per('day'), W=per('week'), M=per('month');
+  const cD=qcCoverage('day',day), cW=qcCoverage('week',day), cM=qcCoverage('month',day);
+  const botDatesIn=s=>[...new Set(qcInScope(all,s,day).map(e=>e.bot+'|'+e.dateLabeled))].length;
+  const dayChecked=botDatesIn('day'), weekChecked=botDatesIn('week'), monthChecked=botDatesIn('month');
+  const bd=qcBotDates('month',day);
+
+  const wkRev=qcInScope(all,'week',day);
+  const wkMap={};
+  wkRev.forEach(e=>{const o=wkMap[e.assignee]||(wkMap[e.assignee]={rev:0,err:0});
+    o.rev++; if(qcHasError(e))o.err++;});
+  const people=Object.keys(wkMap).map(p=>({p,rev:wkMap[p].rev,err:wkMap[p].err,
+    rate:qcRate(wkMap[p].rev,wkMap[p].err)})).filter(x=>x.rev>0);
+  const hi=[...people].sort((a,b)=>b.rate-a.rate||b.rev-a.rev).slice(0,3);
+  const lo=[...people].sort((a,b)=>a.rate-b.rate||b.rev-a.rev).slice(0,3);
+  const ephs=fulltimeNames().map(p=>{
+    const e2=personEpisodes(p,'week',day), h2=personHours(p,'week',day);
+    return {p,eps:e2,hrs:h2,eph:eph(e2,h2)};
+  }).filter(x=>x.hrs>0&&x.eps>0);
+  const slow=[...ephs].sort((a,b)=>a.eph-b.eph).slice(0,3);
+  const fast=[...ephs].sort((a,b)=>b.eph-a.eph).slice(0,3);
+
+  const ps=(l,v)=>`<div class="ps"><div class="psl">${l}</div><div class="psv">${v}</div></div>`;
+  const rank=(list,fmt)=>list.length?list.map((x,i)=>
+      `<div class="qa-rk"><span class="qa-pos">${i+1}</span><span class="qa-nm">${esc(x.p)}</span><span class="qa-val">${fmt(x)}</span></div>`).join('')
+    :'<div class="hint" style="padding:6px 4px">No data</div>';
+
+  app.innerHTML=`
+   <div class="dash-top"><h2>QC ANALYTICS</h2><input type="date" id="dashDate" value="${day}"></div>
+   <div class="hint" style="margin:-4px 0 10px">Full-time annotators only · error rate = episodes with at least one error ÷ episodes reviewed</div>
+
+   <div class="trio" style="grid-template-columns:repeat(3,1fr)">
+     <div class="pp"><div class="pt2">Total reviewed</div><div class="bonus-v">${tot.toLocaleString()}</div><div class="bonus-s">episodes QC'd</div></div>
+     <div class="pp"><div class="pt2">Total errors</div><div class="bonus-v bl-v">${totCodes.toLocaleString()}</div><div class="bonus-s">across ${totErr.toLocaleString()} episodes</div></div>
+     <div class="pp"><div class="pt2">Overall error rate</div><div class="bonus-v ${qcRate(tot,totErr)>10?'bl-v':''}">${qcRate(tot,totErr)}%</div><div class="bonus-s">${totErr.toLocaleString()} of ${tot.toLocaleString()}</div></div>
+   </div>
+
+   <div class="section-head" style="margin-top:20px"><h2>Review activity</h2><span class="hint">by QC check date</span></div>
+   <div class="trio" style="grid-template-columns:repeat(3,1fr)">
+     <div class="pp"><div class="pt2">Daily <span class="pth2">· ${prettyDate(day)}</span></div><div class="pg">${ps('Reviewed',D.rev.toLocaleString())+ps('Errors',D.err.toLocaleString())+ps('Error rate',D.rate+'%')}</div></div>
+     <div class="pp"><div class="pt2">Weekly <span class="pth2">· ${wr[0].slice(5)} – ${wr[1].slice(5)}</span></div><div class="pg">${ps('Reviewed',W.rev.toLocaleString())+ps('Errors',W.err.toLocaleString())+ps('Error rate',W.rate+'%')}</div></div>
+     <div class="pp"><div class="pt2">Monthly <span class="pth2">· ${day.slice(0,7)}</span></div><div class="pg">${ps('Reviewed',M.rev.toLocaleString())+ps('Errors',M.err.toLocaleString())+ps('Error rate',M.rate+'%')}</div></div>
+   </div>
+
+   <div class="section-head" style="margin-top:20px"><h2>QC coverage</h2><span class="hint">how much completed work has been checked</span></div>
+   <div class="trio" style="grid-template-columns:repeat(3,1fr)">
+     ${[['Daily',cD,prettyDate(day),dayChecked],['Weekly',cW,wr[0].slice(5)+' – '+wr[1].slice(5),weekChecked],['Monthly',cM,day.slice(0,7),monthChecked]].map(([lbl,c,sub,dc])=>
+       `<div class="pp"><div class="pt2">${lbl} <span class="pth2">· ${sub}</span></div><div class="pg pg4">
+          ${ps(dc!==null?'Bot-dates':'Dates', dc!==null?String(dc):(c.datesReviewed+'/'+c.dates))}
+          ${ps('Reviewed',c.reviewed.toLocaleString())}
+          ${ps('Unreviewed',c.unreviewed.toLocaleString())}
+          ${ps('Coverage',c.pct+'%')}</div></div>`).join('')}
+   </div>
+
+   <div class="section-head" style="margin-top:20px"><h2>Rankings</h2><span class="hint">this week · ${wr[0].slice(5)} – ${wr[1].slice(5)} · full-timers</span></div>
+   <div class="trio" style="grid-template-columns:repeat(4,1fr)">
+     <div class="pp"><div class="pt2">Highest error rate</div>${rank(hi,x=>x.rate+'% <i>('+x.err+'/'+x.rev+')</i>')}</div>
+     <div class="pp"><div class="pt2">Lowest error rate</div>${rank(lo,x=>x.rate+'% <i>('+x.err+'/'+x.rev+')</i>')}</div>
+     <div class="pp"><div class="pt2">Slowest by EPH</div>${rank(slow,x=>x.eph+' <i>('+x.eps.toLocaleString()+' eps)</i>')}</div>
+     <div class="pp"><div class="pt2">Fastest by EPH</div>${rank(fast,x=>x.eph+' <i>('+x.eps.toLocaleString()+' eps)</i>')}</div>
+   </div>
+
+   <div class="section-head" style="margin-top:20px"><h2>This month · all bots</h2><span class="hint">${day.slice(0,7)}</span></div>
+   <div class="trio" style="grid-template-columns:repeat(3,1fr)">
+     <div class="pp"><div class="pt2">Bot-days QC'd</div><div class="bonus-v">${bd.reviewed}</div><div class="bonus-s">of ${bd.total} bot-days</div></div>
+     <div class="pp"><div class="pt2">Bot-days unreviewed</div><div class="bonus-v bl-v">${bd.unreviewed}</div><div class="bonus-s">no QC recorded</div></div>
+     <div class="pp"><div class="pt2">QC coverage</div><div class="bonus-v">${bd.pct}%</div><div class="bonus-s">bot-days with any QC</div></div>
+   </div>
+   <div class="an-table" style="margin-top:12px">
+     <div class="an-head" style="grid-template-columns:1.4fr repeat(3,1fr);min-width:0"><div>Bot</div><div>Dates QC'd</div><div>Total dates</div><div>Coverage</div></div>
+     ${bd.perBot.length?bd.perBot.map(x=>{const pc=x.tot?Math.round(x.rev/x.tot*1000)/10:0;
+       return `<div class="an-row" style="grid-template-columns:1.4fr repeat(3,1fr);min-width:0">
+         <div class="an-name">${botIcon(x.bot)} ${esc(x.bot)}</div>
+         <div class="${x.rev?'an-eps':'an-zero'}">${x.rev}</div>
+         <div class="an-hrs">${x.tot}</div>
+         <div class="${pc>=100?'an-eps':'an-eph'}">${pc}%</div></div>`;}).join('')
+      :'<div class="an-row"><div class="hint">No data this month</div></div>'}
+   </div>`;
+  const dd=app.querySelector('#dashDate');
+  if(dd)dd.addEventListener('change',e=>{dashDate=e.target.value||todayISO();renderQCAnalytics();});
 }
 
 /* ---------- Annotator ---------- */
