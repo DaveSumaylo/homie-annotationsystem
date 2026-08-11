@@ -403,10 +403,8 @@
   .pg.pg4{grid-template-columns:repeat(4,1fr)}
   .pg.pg4 .psv{font-size:15px}
   .pg.pg4 .psl{font-size:8.5px}
-  .qd-range{display:inline-flex;align-items:center;gap:6px}
-  .qd-range input[type="date"]{padding:5px 8px;font-size:11px;border-radius:8px;
+  .qa-date{margin-left:auto;padding:6px 10px;font-size:11.5px;border-radius:9px;
     background:var(--surface-3);color:var(--ink);border:1px solid var(--border);font-family:inherit}
-  .qd-sep{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--ink-faint)}
   .qd-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:10px}
   .qd-card{padding:18px 20px}
   .qd-wrap{position:relative;height:440px;min-height:440px;max-height:440px;margin-top:8px}
@@ -2266,7 +2264,7 @@ const QC_CODES=[['101','Unlabeled Actions'],['102','Missing Main Task / Fail Tas
  ['104','Missing "end"'],['105','Missing Moving Action (Start of main task)'],['106','Missing Moving Action (Between subtask)'],
  ['201','Wrong keyword used'],['202','Outdated Keywords'],['301','Human Intervention'],['302','Frozen Image / Fail'],
  ['303','Mislabeled (Labeled wrongly)'],['401','Timestamp/Gap Adjustment Needed']];
-let qcSel={bot:null,day:null};let qcBotFilter='';let qcFrom='',qcTo='';const qcPicked=new Set();
+let qcSel={bot:null,day:null};let qcBotFilter='';const qcPicked=new Set();
 const qcCollapsed=new Set(), qcOpenMonths=new Set(), qcExpanded=new Set();
 
 function qcEpisodesFor(bot){return episodesFor(bot).filter(e=>e.done);}   /* completed only */
@@ -2464,10 +2462,6 @@ function qcReviewedFT(){               /* full-timers only, everywhere */
   return _qcRevCache;
 }
 function qcInScope(list,scope,day){
-  if(scope==='range'){
-    if(!qcFrom||!qcTo)return [];
-    return list.filter(e=>{const d=qcDay(e);return d&&d>=qcFrom&&d<=qcTo;});
-  }
   if(scope==='all')return list;
   return list.filter(e=>{const d=qcDay(e);if(!d)return false;
     if(scope==='day')return d===day;
@@ -2765,7 +2759,6 @@ function qcDrawDonut(id,st){
 function renderQCAnalytics(){
   const day=dashDate;
   const stW=qcReasonStats('week',day), stM=qcReasonStats('month',day), stA=qcReasonStats('all',day);
-  const stR=(qcFrom&&qcTo)?qcReasonStats('range',day):null;
   const all=qcReviewedFT();
   const tot=all.length, totErr=all.filter(qcHasError).length;
   const totCodes=all.reduce((s,e)=>s+qcErrCount(e),0);
@@ -2799,14 +2792,7 @@ function renderQCAnalytics(){
     :'<div class="hint" style="padding:6px 4px">No data</div>';
 
   app.innerHTML=`
-   <div class="dash-top"><h2>QC ANALYTICS</h2>
-     <span class="qd-range">
-       <input type="date" id="dashDate" value="${day}" title="Week / month shown">
-       <span class="qd-sep">range</span>
-       <input type="date" id="qcFrom" value="${esc(qcFrom)}" title="Custom range from">
-       <input type="date" id="qcTo" value="${esc(qcTo)}" title="Custom range to">
-       ${(qcFrom&&qcTo)?'<button class="btn btn-sm" id="qcRangeClr">✕</button>':''}
-     </span></div>
+   <div class="dash-top"><h2>QC ANALYTICS</h2><input type="date" id="dashDate" class="qa-date" value="${day}"></div>
 
    <div class="trio" style="grid-template-columns:repeat(3,1fr)">
      <div class="pp"><div class="pt2"><span class="qa-i i-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg></span>Total reviewed</div><div class="bonus-v">${tot.toLocaleString()}</div><div class="bonus-s">episodes QC'd</div></div>
@@ -2841,7 +2827,6 @@ function renderQCAnalytics(){
 
    <div class="section-head" style="margin-top:22px"><h2>Error rate &amp; failure reasons</h2><span class="hint">inner ring: error rate · outer ring: reason breakdown</span></div>
    <div class="qd-grid">
-     ${(qcFrom&&qcTo)?qcDonutBlock('qd-rg','Selected Range Error Rate &amp; Failure Reasons','('+esc(qcFrom)+' → '+esc(qcTo)+' · inner: error rate · outer: reason breakdown)',stR):''}
      ${qcDonutBlock('qd-wk','Weekly Error Rate &amp; Failure Reasons','(this week · inner: error rate · outer: reason breakdown)',stW)}
      ${qcDonutBlock('qd-mo','Monthly Error Rate &amp; Failure Reasons','(this month · inner: error rate · outer: reason breakdown)',stM)}
      ${qcDonutBlock('qd-al','Overall Error Rate &amp; Failure Reasons','(all-time · inner: error rate · outer: reason breakdown)',stA)}
@@ -2864,15 +2849,9 @@ function renderQCAnalytics(){
       :'<div class="an-row"><div class="hint">No data this month</div></div>'}
    </div>`;
   destroyCharts();
-  if(stR)qcDrawDonut('qd-rg',stR);
   qcDrawDonut('qd-wk',stW); qcDrawDonut('qd-mo',stM); qcDrawDonut('qd-al',stA);
   const dd=app.querySelector('#dashDate');
   if(dd)dd.addEventListener('change',e=>{dashDate=e.target.value||todayISO();renderQCAnalytics();});
-  const qf=app.querySelector('#qcFrom'), qt=app.querySelector('#qcTo');
-  if(qf)qf.addEventListener('change',e=>{qcFrom=e.target.value||'';renderQCAnalytics();});
-  if(qt)qt.addEventListener('change',e=>{qcTo=e.target.value||'';renderQCAnalytics();});
-  const qc2=app.querySelector('#qcRangeClr');
-  if(qc2)qc2.addEventListener('click',()=>{qcFrom='';qcTo='';renderQCAnalytics();});
 }
 
 /* ---------- Annotator ---------- */
