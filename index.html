@@ -1656,6 +1656,34 @@ function pcard(title,eps,hrs,ephv,accent){return `<div class="pcard" style="--pc
   <div class="pm"><div class="pl">Hours</div><div class="pv">${fmtHrs(hrs)}</div></div>
   <div class="pm"><div class="pl">EPH</div><div class="pv" style="color:var(--pc)">${ephv}</div></div></div></div>`;}
 function weeksBetween(a,b){const out=[];const pa=a.split('-').map(Number),pb=b.split('-').map(Number);let d=new Date(Date.UTC(pa[0],pa[1]-1,pa[2]));const stop=new Date(Date.UTC(pb[0],pb[1]-1,pb[2]));while(d<=stop){out.push(d.toISOString().slice(0,10));d.setUTCDate(d.getUTCDate()+7);}return out;}
+function qcErrSeries(day){
+  /* % of reviewed episodes that had at least one error, by QC check date */
+  const YR=day.slice(0,4);
+  const wk={},mo={};
+  state.episodes.forEach(e=>{
+    if(!e.done||!e.qcChecked||!isFulltimeName(e.assignee))return;
+    const d=(e.qcDate||'').slice(0,10);
+    if(!d||!/^\d{4}-\d{2}-\d{2}$/.test(d)||d.slice(0,4)!==YR)return;
+    const bad=qcErrCount(e)>0?1:0;
+    const w=isoWeekRange(d)[0];
+    (wk[w]=wk[w]||{n:0,e:0}).n++; wk[w].e+=bad;
+    const m=d.slice(0,7);
+    (mo[m]=mo[m]||{n:0,e:0}).n++; mo[m].e+=bad;
+  });
+  const mk=(obj,labelFn)=>{
+    const keys=Object.keys(obj).sort();
+    return {labels:keys.map(labelFn),
+            data:keys.map(k=>Math.round(obj[k].e/obj[k].n*1000)/10),
+            meta:keys.map(k=>obj[k])};
+  };
+  return {W:mk(wk,k=>'WK'+isoWeekNum(k)), M:mk(mo,k=>k)};
+}
+function isoWeekNum(mondayISO){
+  const p=mondayISO.split('-').map(Number);
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  const yStart=new Date(Date.UTC(p[0],0,1));
+  return Math.floor((d-yStart)/(7*86400000))+1;
+}
 function dashSeries(day){
   const wk={};const mo={};
   const OKDATE=/^\d{4}-\d{2}-\d{2}$/;   /* a single malformed date must not blank the charts */
@@ -1694,6 +1722,7 @@ function renderDashboard(){
   const flNames=freelancerNames();
   const kpi=fulltimeNames().map(p=>({p,d:personDaily(p,day),w:personWeekly(p,day)})).sort((a,b)=>b.w-a.w||b.d-a.d).slice(0,10);
   const S=dashSeries(day);
+  const E=qcErrSeries(day);
   const wr=isoWeekRange(day);
   const wkAvgArr=S.W.data.slice(0,-1).filter(v=>v>0);const wkAvg=wkAvgArr.length?Math.round(wkAvgArr.reduce((s,v)=>s+v,0)/wkAvgArr.length):0;
   const moFull=S.M.data.slice(0,-1).filter(v=>v>0);const moAvg=moFull.length?Math.round(moFull.reduce((s,v)=>s+v,0)/moFull.length):0;
@@ -1729,11 +1758,11 @@ function renderDashboard(){
      <div class="dash-left">
        <div class="chart-row">
          <div class="panel"><div class="pt">Team Weekly Performance <span class="pth">avg ${wkAvg.toLocaleString()} eps/wk</span></div><div class="chbox"><canvas id="cv-wperf"></canvas></div></div>
-         <div class="panel"><div class="pt">Team Weekly Error Trend <span class="pth">QC error rate</span></div><div class="chbox"><div class="chart-empty">AWAITING QC / ERROR DATA</div></div></div>
+         <div class="panel"><div class="pt">Team Weekly Error Trend <span class="pth">QC error rate${E.W.data.length?' · avg '+(Math.round(E.W.data.reduce((a,b)=>a+b,0)/E.W.data.length*10)/10)+'%':''}</span></div><div class="chbox">${E.W.data.length?'<canvas id="cv-werr"></canvas>':'<div class="chart-empty">NO QC DATA THIS YEAR</div>'}</div></div>
        </div>
        <div class="chart-row">
          <div class="panel"><div class="pt">Team Monthly Performance <span class="pth">${trend?trend+' · ':''}avg ${moAvg.toLocaleString()} eps/mo</span></div><div class="chbox"><canvas id="cv-mperf"></canvas></div></div>
-         <div class="panel"><div class="pt">Team Monthly Error Trend <span class="pth">QC error rate</span></div><div class="chbox"><div class="chart-empty">AWAITING QC / ERROR DATA</div></div></div>
+         <div class="panel"><div class="pt">Team Monthly Error Trend <span class="pth">QC error rate${E.M.data.length?' · avg '+(Math.round(E.M.data.reduce((a,b)=>a+b,0)/E.M.data.length*10)/10)+'%':''}</span></div><div class="chbox">${E.M.data.length?'<canvas id="cv-merr"></canvas>':'<div class="chart-empty">NO QC DATA THIS YEAR</div>'}</div></div>
        </div>
      </div>
      <div class="panel"><div class="pt">KPI Status <span class="pth">D: ${DAILY_TARGET} &nbsp;|&nbsp; W: ${WEEKLY_TARGET} eps</span></div>
@@ -1784,6 +1813,33 @@ function renderDashboard(){
   if(typeof Chart!=='undefined'){
     const c1=document.getElementById('cv-wperf');
     if(c1&&S.W.data.length)_charts.push(new Chart(c1,{type:'bar',data:{labels:S.W.labels,datasets:[{data:S.W.data,backgroundColor:S.W.colors,borderColor:S.W.colors.map(c=>c.replace('.9','1').replace('.7','1')),borderWidth:2,borderRadius:6}]},options:chartOpts()}));
+    /* --- QC error-rate trend lines --- */
+    const errOpts=(S2)=>({
+      responsive:true,maintainAspectRatio:false,animation:false,
+      scales:{
+        y:{beginAtZero:true,ticks:{color:'#7b8794',font:{size:9},callback:v=>v+'%'},
+           grid:{color:'rgba(255,255,255,.05)'}},
+        x:{ticks:{color:'#7b8794',font:{size:9},maxRotation:0,autoSkip:true},grid:{display:false}}
+      },
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'rgba(9,14,20,.97)',borderColor:'rgba(255,255,255,.22)',
+          borderWidth:1,titleColor:'#fff',bodyColor:'#e2e8f0',padding:11,
+          callbacks:{label:c=>{const m=S2.meta[c.dataIndex];
+            return c.parsed.y+'%  ('+m.e+' of '+m.n+' reviewed)';}}}}
+    });
+    const cw=document.getElementById('cv-werr');
+    if(cw&&E.W.data.length)_charts.push(new Chart(cw,{type:'line',
+      data:{labels:E.W.labels,datasets:[{data:E.W.data,borderColor:'#f87171',
+        backgroundColor:'rgba(248,113,113,.14)',fill:true,tension:.3,
+        pointRadius:2.5,pointBackgroundColor:'#f87171',borderWidth:2}]},
+      options:errOpts(E.W)}));
+    const cm=document.getElementById('cv-merr');
+    if(cm&&E.M.data.length)_charts.push(new Chart(cm,{type:'line',
+      data:{labels:E.M.labels,datasets:[{data:E.M.data,borderColor:'#fbbf24',
+        backgroundColor:'rgba(251,191,36,.14)',fill:true,tension:.3,
+        pointRadius:3,pointBackgroundColor:'#fbbf24',borderWidth:2}]},
+      options:errOpts(E.M)}));
+
     const c2=document.getElementById('cv-mperf');
     if(c2&&S.M.data.length)_charts.push(new Chart(c2,{type:'bar',data:{labels:S.M.labels,datasets:[{data:S.M.data,backgroundColor:S.M.colors,borderColor:S.M.colors,borderWidth:2,borderRadius:6}]},options:chartOpts()}));
   }
