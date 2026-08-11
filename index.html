@@ -1030,7 +1030,7 @@ async function backgroundLoadOlder(){
   try{
     const rows=await cloudLoadRange('0000-01-01',windowStartISO());
     const n=mergeLoadedRows(rows);
-    if(n){persistLocal();if(!isTypingNow())render();}
+    if(n){persistLocal();if(!isTypingNow())renderThrottled();}
     _bgLoaded=true;_bgLoading=false;
     console.log('%c[Project Homie] older episodes loaded in background','color:#10a874','+'+n.toLocaleString());
   }catch(e){console.warn('background load failed',e);_bgLoaded=false;_bgLoading=false;}
@@ -1182,18 +1182,7 @@ async function cloudPoll(){
     }catch(e){console.error('poll meta',e);}
     // episodes: incremental by updated_at, then count check for deletions
     try{
-      /* page through bulk changes so a large update (e.g. a QC import) is picked
-         up in one cycle instead of 1000 rows at a time */
-      let _acc=[],_guard=0,_wm=epWatermark||'1970-01-01';
-      while(_guard++<12){
-        const rr=await sbFetch('episodes?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(_wm),{headers:sbHeaders()});
-        const batch=await rr.json();
-        if(!Array.isArray(batch)||!batch.length)break;
-        _acc=_acc.concat(batch);
-        _wm=batch[batch.length-1].updated_at||_wm;
-        if(batch.length<1000)break;
-      }
-      const r={json:async()=>_acc};
+      const r=await sbFetch('episodes?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(epWatermark||'1970-01-01'),{headers:sbHeaders()});
       const rows=await r.json();
       if(rows.length){
         epWatermark=maxWm(rows,epWatermark);
@@ -1236,7 +1225,7 @@ async function cloudPoll(){
       const cr=rc.headers.get('content-range')||'0-0/0';const mm=cr.match(/\/(\d+)$/);const tn=mm?+mm[1]:0;
       if(tn!==syncedTimes.size){await fullTimeResync();dirty=true;}
     }catch(e){handlePollErr(e);}
-    if(dirty){persistLocal();if(!isTypingNow())render();}
+    if(dirty){persistLocal();if(!isTypingNow())renderThrottled();}
   }catch(e){console.error('poll',e);}
   polling=false;
 }
@@ -1693,10 +1682,10 @@ function dashSeries(day){
   const curW=isoWeekRange(day)[0];
   const yrStart=isoWeekRange(YR+'-01-01')[0];
   const firstW=wkKeys.length?(wkKeys[0]<yrStart?yrStart:wkKeys[0]):yrStart;
-  const weeks=weeksBetween(firstW>curW?curW:firstW,curW);
+  const weeks=weeksBetween(firstW>curW?curW:firstW,curW).filter(w=>(wk[w]||0)>0);
   const W={labels:weeks.map(w=>'Wk'+isoWeekNum(w)),data:weeks.map(w=>wk[w]||0),colors:weeks.map(w=>w===curW?'rgba(76,175,80,.9)':'rgba(66,165,245,.7)')};
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const moKeys=Object.keys(mo).filter(k=>k.slice(0,4)===YR).sort();
+  const moKeys=Object.keys(mo).filter(k=>k.slice(0,4)===YR&&mo[k]>0).sort();
   const M={labels:moKeys.map(k=>MN[+k.slice(5,7)-1]),data:moKeys.map(k=>mo[k]),colors:moKeys.map((k,i)=>COLORS[i%COLORS.length]),keys:moKeys};
   return {W,M};
 }
@@ -1827,18 +1816,28 @@ function renderDashboard(){
           callbacks:{label:c=>{const m=S2.meta[c.dataIndex];
             return c.parsed.y+'%  ('+m.e+' of '+m.n+' reviewed)';}}}}
     });
+    /* colour each point by severity: green good, amber watch, red high */
+    const sevColor=v=>v<5?'#10a874':v<12?'#fbbf24':'#f87171';
+    const gradFill=(cv2,from)=>{
+      const g=cv2.getContext('2d').createLinearGradient(0,0,0,cv2.height||220);
+      g.addColorStop(0,from); g.addColorStop(1,'rgba(16,168,116,0)');
+      return g;
+    };
+    const errData=(S2,cv2,tint)=>({labels:S2.labels,datasets:[{
+      data:S2.data, fill:true, tension:.35, borderWidth:2.4,
+      backgroundColor:gradFill(cv2,tint),
+      segment:{borderColor:c=>sevColor(Math.max(c.p0.parsed.y,c.p1.parsed.y))},
+      borderColor:'#10a874',
+      pointRadius:3.4, pointHoverRadius:6,
+      pointBackgroundColor:S2.data.map(sevColor),
+      pointBorderColor:'rgba(9,14,20,.9)', pointBorderWidth:1.5
+    }]});
     const cw=document.getElementById('cv-werr');
     if(cw&&E.W.data.length)_charts.push(new Chart(cw,{type:'line',
-      data:{labels:E.W.labels,datasets:[{data:E.W.data,borderColor:'#f87171',
-        backgroundColor:'rgba(248,113,113,.14)',fill:true,tension:.3,
-        pointRadius:2.5,pointBackgroundColor:'#f87171',borderWidth:2}]},
-      options:errOpts(E.W)}));
+      data:errData(E.W,cw,'rgba(248,113,113,.28)'), options:errOpts(E.W)}));
     const cm=document.getElementById('cv-merr');
     if(cm&&E.M.data.length)_charts.push(new Chart(cm,{type:'line',
-      data:{labels:E.M.labels,datasets:[{data:E.M.data,borderColor:'#fbbf24',
-        backgroundColor:'rgba(251,191,36,.14)',fill:true,tension:.3,
-        pointRadius:3,pointBackgroundColor:'#fbbf24',borderWidth:2}]},
-      options:errOpts(E.M)}));
+      data:errData(E.M,cm,'rgba(251,191,36,.28)'), options:errOpts(E.M)}));
 
     const c2=document.getElementById('cv-mperf');
     if(c2&&S.M.data.length)_charts.push(new Chart(c2,{type:'bar',data:{labels:S.M.labels,datasets:[{data:S.M.data,backgroundColor:S.M.colors,borderColor:S.M.colors,borderWidth:2,borderRadius:6}]},options:chartOpts()}));
@@ -2009,7 +2008,18 @@ function chartPlaceholder(msg){return `<div class="chart-empty">${msg}</div>`;}
 function niceMax(v){if(v<=1)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const st=[1,2,2.5,5,10];for(const s of st){if(v<=s*p)return s*p;}return 10*p;}
 function fmtK(v){v=Math.round(v);return v>=1000?(v%1000===0?(v/1000)+'k':(v/1000).toFixed(1)+'k'):''+v;}
 function svgBars(series){if(!series.length)return chartPlaceholder('No data');const n=series.length,W=Math.max(360,n*34),H=205,L=32,R=8,T=12,B=22;const max=niceMax(Math.max(1,...series.map(s=>s.value)));const pw=W-L-R,ph=H-T-B,slot=pw/n,bw=Math.min(24,slot*0.58);let g='';for(let i=0;i<=4;i++){const yy=T+ph-ph*(i/4);g+=`<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W-R}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity=".45"/><text x="${L-4}" y="${(yy+3).toFixed(1)}" font-size="7.5" fill="var(--ink-faint)" text-anchor="end">${fmtK(max*i/4)}</text>`;}let b='';series.forEach((s,i)=>{const cx=L+slot*i+slot/2;const bh=ph*(s.value/max);const y=T+ph-bh;const c=s.color||(s.hot?'var(--acc)':'#3b82f6');b+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="2.5" fill="${c}"><title>${s.label}: ${s.value.toLocaleString()}</title></rect><text x="${cx.toFixed(1)}" y="${H-7}" font-size="6.8" fill="var(--ink-faint)" text-anchor="middle">${s.label}</text>`;});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="205" preserveAspectRatio="xMidYMax meet">${g}${b}</svg>`;}
-function render(){ if(isQC()&&!['qc','qcan','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else renderAnnotator(); }
+let _lastChartRender=0,_deferTimer=null;
+function renderThrottled(){
+  /* charts are costly to rebuild; on chart tabs coalesce poll-driven renders */
+  const chartTab=(mode==='dashboard'||mode==='qcan');
+  if(!chartTab){render();return;}
+  const since=Date.now()-_lastChartRender;
+  if(since>=45000){render();return;}
+  clearTimeout(_deferTimer);
+  _deferTimer=setTimeout(render,45000-since);
+}
+function render(){ if(mode==='dashboard'||mode==='qcan')_lastChartRender=Date.now();
+  if(isQC()&&!['qc','qcan','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
