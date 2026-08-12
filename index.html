@@ -949,7 +949,7 @@ function isQC(){return me.role==='qc';}
 function isFullTimeUser(){return me.role==='fulltime'||me.role==='annotator';}
 function isWorker(){return me.role==='fulltime'||me.role==='freelancer'||me.role==='annotator';}
 function applyRole(){
-  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser())?'':'none';
+  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser()||isQC())?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
@@ -963,14 +963,14 @@ function applyRole(){
   if(isFreelancer()&&!['backlog','dashboard'].includes(mode)){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
-  if(!(isManager()||isFullTimeUser())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(!(isManager()||isFullTimeUser()||isQC())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isFreelancer()&&mode==='timelog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
-  if(isQC()){   /* QC: QC tab + Dashboard + Time Log (clock in/out for records) */
-    ['tabEpisodes','tabBacklog','tabManager','btnSettings'].forEach(function(id){
+  if(isQC()){   /* QC: QC + QC Analytics + Dashboard + Time Log + Production (view only) */
+    ['tabEpisodes','tabBacklog','btnSettings'].forEach(function(id){
       const el=document.getElementById(id);if(el)el.style.display='none';});
-    ['tabQc','tabDashboard','tabTimelog'].forEach(function(id){
+    ['tabQc','tabQcAn','tabDashboard','tabTimelog','tabManager'].forEach(function(id){
       const el=document.getElementById(id);if(el)el.style.display='';});
-    if(!['qc','qcan','dashboard','timelog'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
+    if(!['qc','qcan','dashboard','timelog','manager'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
   }
   document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));
 }
@@ -2041,7 +2041,7 @@ function renderThrottled(){
   _deferTimer=setTimeout(render,45000-since);
 }
 function render(){ if(mode==='dashboard'||mode==='qcan')_lastChartRender=Date.now();
-  if(isQC()&&!['qc','qcan','dashboard','timelog'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else renderAnnotator(); }
+  if(isQC()&&!['qc','qcan','dashboard','timelog','manager'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
