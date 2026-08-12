@@ -1542,13 +1542,31 @@ function clockInPerson(p){
   toast(p+' clocked in · '+tlHM(e.start));
   renderTimeLog();
 }
-function clockOutPerson(p){
+async function clockOutPerson(p){
   if(!p)return;
   const t=state.timeEntries.find(x=>x.person===p&&x.start&&!x.end);
   if(!t){toast('No open shift for '+p);return;}
   t.end=todayISO()+'T'+nowHM();
   const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;
-  save();persistLocal();pushEntry(t);
+  save();persistLocal();
+  /* The clock-out record MUST reach the database before we release their work.
+     Previously this was fire-and-forget, so the release could succeed while the
+     shift stayed open — losing the hours. */
+  if(CLOUD&&session){
+    try{
+      await cloudUpsertEntries([t]);
+      syncedTimes.set(t.id,timeSig(t));
+      if(pendingTimeAdds.delete(t.id))savePendAdds();
+      setSyncStatus('synced');
+    }catch(e){
+      setSyncStatus('error',e.message);
+      t.end='';t.minutes=0;                       /* roll back: still clocked in */
+      save();persistLocal();renderTimeLog();
+      toast('⚠ CLOCK OUT NOT SAVED — please try again');
+      console.error('clockout save failed',e);
+      return;                                     /* do NOT release */
+    }
+  }
   toast(p+' clocked out · '+fmtHM(t.minutes));
   if(CLOUD&&session&&engineOk){sbRpc('release_to_backlog',{p_user:p}).then(async n=>{const c=Array.isArray(n)?n[0]:n;
     try{await fullEpisodeResync();}catch(e){console.error('resync after clockout',e);}
