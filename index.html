@@ -734,27 +734,22 @@ async function healthCheck(){
      still has work means the batch scattered without cause */
   const badSplit=split.filter(p=>[...byPerson[p]].every(b=>(avail[b]||0)>0));
 
-  /* RULE: finish the current bot before moving on. Flag anyone working a bot
-     while a DIFFERENT bot they were on more recently still has waiting work. */
-  const lastBot={};
-  state.episodes.forEach(e=>{
-    if(!(e.assignee||'').trim())return;
-    const k=e.assignee, t=e.dateLabeled||'';
-    if(!lastBot[k]||t>lastBot[k].t)lastBot[k]={bot:e.bot,t:t};
-  });
-  const stranded=[];
+  /* RULE (11 Aug 2026): the preferred bot wins. Someone is only misplaced if
+     they are working a bot that is NOT their own while their own bot has work. */
+  const avail2={};
+  state.episodes.forEach(e=>{if(!e.done&&!(e.assignee||'').trim())avail2[e.bot]=(avail2[e.bot]||0)+1;});
+  const misplaced=[];
   Object.keys(byPerson).forEach(p=>{
     if(!isFulltimeName(p))return;
+    const own=prefBot[p]||null;
+    if(!own)return;
     const onBots=[...byPerson[p]];
-    Object.keys(avail).forEach(b=>{
-      if(onBots.includes(b))return;
-      if((avail[b]||0)===0)return;
-      const prev=state.episodes.some(e=>e.assignee===p&&e.bot===b);
-      if(prev)stranded.push(p+' on '+onBots.join('/')+' but '+b+' has '+avail[b]+' left');
-    });
+    if(onBots.includes(own))return;                    /* on their own bot: fine */
+    if((avail2[own]||0)>0)misplaced.push(p+' on '+onBots.join('/')+' but '+own+' has '+avail2[own]+' left');
   });
-  add('Assignment','Bots finished before moving on',stranded.length?'WARN':'OK',
-      stranded.length?stranded.slice(0,3).join(' · '):'no bot left part-done');
+  add('Assignment','On their preferred bot',misplaced.length?'WARN':'OK',
+      misplaced.length?misplaced.slice(0,3).join(' · ')
+        :'everyone on their own bot, or their bot is empty');
   add('Assignment','Full-timers on one bot',badSplit.length?'WARN':'OK',
       badSplit.length?badSplit.map(p=>p+' ('+[...byPerson[p]].join(', ')+')').join(' · ')
         :(split.length?split.length+' split after a bot ran dry (expected)':'no split queues'));
@@ -898,15 +893,19 @@ async function fetchProfile(){
 /* ---- Roster: name -> role, single source of truth from Supabase profiles ---- */
 const FULLTIME_FALLBACK=['Alwin','Ata','Axl','Cris','Kent','Mark Aaron','Darius','Sean','Sharbell','Jerome'];
 let roleMap={};   // { "Darius":"fulltime", "Ace":"freelancer", ... }
+let prefBot={};   // { "Darius":"Alpha", ... }
 async function fetchRoster(){
   if(!CLOUD||!session)return;
   try{
-    const r=await sbFetch('profiles?select=display_name,role',{headers:sbHeaders()});
+    const r=await sbFetch('profiles?select=display_name,role,preferred_bot',{headers:sbHeaders()});
     const j=await r.json();
     if(Array.isArray(j)&&j.length){
       const m={};
-      j.forEach(p=>{const n=(p.display_name||'').trim();if(n)m[n]=(p.role||'').trim();});
-      roleMap=m;
+      const pb={};
+      j.forEach(p=>{const n=(p.display_name||'').trim();if(!n)return;
+        m[n]=(p.role||'').trim();
+        if(p.preferred_bot)pb[n]=String(p.preferred_bot).trim();});
+      roleMap=m; prefBot=pb;
     }
   }catch(e){console.error('roster',e);}
 }
