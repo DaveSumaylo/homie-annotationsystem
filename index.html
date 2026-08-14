@@ -857,7 +857,7 @@ function verifyTotals(){
   return rows;
 }
 async function refreshServerTotals(force){
-  if(!CLOUD||!session)return;
+  if(!CLOUD||(!session&&!PUBLIC_VIEW))return;
   if(!force&&Date.now()-srvTotalsAt<60000)return;   /* at most once a minute */
   try{
     const [bt,pt]=await Promise.all([sbRpc('bot_totals',{}),sbRpc('person_totals',{})]);
@@ -955,7 +955,7 @@ const FULLTIME_FALLBACK=['Alwin','Ata','Axl','Cris','Kent','Mark Aaron','Darius'
 let roleMap={};   // { "Darius":"fulltime", "Ace":"freelancer", ... }
 let prefBot={};   // { "Darius":"Alpha", ... }
 async function fetchRoster(){
-  if(!CLOUD||!session)return;
+  if(!CLOUD||(!session&&!PUBLIC_VIEW))return;
   try{
     const r=await sbFetch('profiles?select=display_name,role,preferred_bot',{headers:sbHeaders()});
     const j=await r.json();
@@ -1105,7 +1105,7 @@ function mergeLoadedRows(rows){
 /* load anything older than the window, quietly, after the app is usable */
 let _bgLoaded=false,_bgLoading=false;
 async function backgroundLoadOlder(){
-  if(_bgLoaded||_bgLoading||!CLOUD||!session)return; _bgLoading=true;
+  if(_bgLoaded||_bgLoading||!CLOUD||(!session&&!PUBLIC_VIEW))return; _bgLoading=true;
   try{
     const rows=await cloudLoadRange('0000-01-01',windowStartISO());
     const n=mergeLoadedRows(rows);
@@ -1253,7 +1253,7 @@ function schedulePoll(){
 }
 function startAdaptivePoll(){schedulePoll();}
 async function cloudPoll(){
-  if(!CLOUD||!session||pollDisabled||polling||syncing)return;
+  if(!CLOUD||(!session&&!PUBLIC_VIEW)||pollDisabled||polling||syncing)return;
   polling=true;
   try{
     let dirty=false;
