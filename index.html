@@ -1170,6 +1170,7 @@ async function cloudPushMeta(){
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
   if(!CLOUD||!SB)return;
+  if(PUBLIC_VIEW)return;   /* the shared view is strictly read-only */
   if(polling){clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,500);return;}
   if(syncing){syncQueued=true;return;}
   syncing=true;setSyncStatus('sync');
@@ -3739,6 +3740,10 @@ async function enterPublicView(){
   setTimeout(backgroundLoadOlder,1500);
   refreshServerTotals(true);
   setInterval(()=>refreshServerTotals(false),60000);
+  /* keep the shared view live: poll like the normal app, and refresh on focus */
+  startAdaptivePoll();
+  window.addEventListener('focus',()=>{lastActivity=Date.now();cloudPoll();});
+  setInterval(fetchRoster,60000);
 }
 function showLogin(){
   hideBoot();
