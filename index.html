@@ -284,7 +284,7 @@
   .qc-badge{margin-left:6px;font-size:9px;font-weight:800;background:rgba(180,83,9,.2);color:var(--amber);border:1px solid rgba(180,83,9,.45);border-radius:20px;padding:1px 6px}
   .qc-detail{padding:8px 14px 12px 30px;background:var(--surface-2)}
   .qc-mcap{border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:8px;background:var(--surface)}
-  .qc-mcap-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11px}
+  .qc-mcap-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:12.5px}
   .qc-codes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
   .qc-code{font-size:10.5px;font-weight:700;background:var(--surface-3);border:1px solid var(--border);border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:5px}
   .qc-code button{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:12px;line-height:1}
@@ -310,6 +310,12 @@
   .clk-time{font-variant-numeric:tabular-nums;font-weight:800;font-size:12.5px;color:var(--acc);min-width:56px}
   /* dashboard */
   .dash-top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .dash-tools{margin-left:auto;display:inline-flex;align-items:center;gap:8px}
+  .dash-tools input[type="date"],.dash-tools #btnWeekReport{
+    height:32px;padding:0 12px;font-size:11.5px;font-weight:700;border-radius:9px;
+    border:1px solid var(--border);background:var(--surface-3);color:var(--ink);
+    font-family:inherit;line-height:normal;box-sizing:border-box}
+  .dash-tools #btnWeekReport{background:var(--acc);color:#04231a;border-color:transparent;cursor:pointer}
   .dash-top h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.4px}
   .dash-top input[type=date]{width:auto;margin-left:auto}
   .dash-periods{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
@@ -405,6 +411,59 @@
   .pg.pg4 .psl{font-size:8.5px}
   .qa-date{margin-left:auto;padding:6px 10px;font-size:11.5px;border-radius:9px;
     background:var(--surface-3);color:var(--ink);border:1px solid var(--border);font-family:inherit}
+  /* ---- weekly report ---- */
+  .rp-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .rp-wk{font-size:12px;font-weight:800;color:var(--ink);margin-right:auto}
+  .rp-doc{background:#fff;color:#111827;border-radius:12px;padding:26px 30px;max-width:920px}
+  .rp-doc *{text-transform:none}
+  .rp-title{font-size:20px;font-weight:800;letter-spacing:.5px}
+  .rp-sub{font-size:10px;font-weight:800;color:#0e9f6e;letter-spacing:1.2px;margin-top:1px}
+  .rp-date{font-size:10px;color:#9ca3af;margin-top:2px}
+  .rp-head{border-bottom:2px solid #0e9f6e;padding-bottom:8px;margin-bottom:4px}
+  .rp-h2{color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px;padding:6px 9px;
+    border-radius:5px;margin:16px 0 8px}
+  .rp-h2-a{background:#0f766e}.rp-h2-b{background:#b45309}.rp-h2-c{background:#1d4ed8}
+  .rp-h3{font-size:10.5px;font-weight:800;margin:14px 0 5px}
+  .rp-red{color:#dc2626}.rp-grn{color:#0e9f6e}.rp-amb{color:#b45309}.rp-blu{color:#1d4ed8}
+  .rp-tbl{width:100%;border-collapse:collapse;font-size:9.5px;border:1px solid #e5e7eb}
+  .rp-tbl th{background:#f3f4f6;color:#4b5563;font-size:8px;font-weight:800;letter-spacing:.4px;
+    text-align:left;padding:6px 8px;border-bottom:1px solid #e5e7eb}
+  .rp-tbl td{padding:5px 8px;border-bottom:1px solid #f3f4f6;color:#111827}
+  .rp-tbl tr:last-child td{border-bottom:none}
+  .rp-tbl tr:nth-child(even) td{background:#fafafa}
+  .rp-nm{font-weight:700}
+  .rp-c{text-align:center;font-variant-numeric:tabular-nums}
+  .rp-sm{font-size:8.5px;color:#4b5563}
+  .rp-none{text-align:center;color:#9ca3af;font-style:italic;padding:10px}
+  .rp-metric th:not(:first-child),.rp-metric td:not(:first-child){text-align:right}
+  .rp-cur{font-weight:800}
+  .rp-prev{color:#9ca3af}
+  .rp-d{font-size:9px;font-weight:700;white-space:nowrap}
+  .rp-up{color:#0e9f6e}.rp-down{color:#dc2626}.rp-flat{color:#9ca3af}
+  .rp-good{color:#0e9f6e;font-weight:800}.rp-bad{color:#dc2626;font-weight:800}
+  .rp-amber{color:#b45309;font-weight:800}
+  .rp-boxes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 10px}
+  .rp-box{border:1px solid #e5e7eb;border-radius:8px;padding:12px 8px;text-align:center}
+  .rp-box.rp-ok{background:#ecfdf5;border-color:#0e9f6e}
+  .rp-box.rp-warn{background:#fffbeb;border-color:#b45309}
+  .rp-bv{font-size:22px;font-weight:800;line-height:1}
+  .rp-bl{font-size:7px;font-weight:800;color:#9ca3af;letter-spacing:.6px;margin-top:5px}
+  .rp-bars{margin-top:4px}
+  .rp-brow{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:9.5px}
+  .rp-blbl{width:150px;flex:none}
+  .rp-btrack{flex:1;height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden}
+  .rp-btrack i{display:block;height:100%}
+  .rp-bval{width:78px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .rp-foot{margin-top:16px;padding-top:9px;border-top:1px solid #e5e7eb;
+    font-size:7.5px;color:#9ca3af;line-height:1.5}
+  @media print{
+    body *{visibility:hidden!important}
+    #rpDoc,#rpDoc *{visibility:visible!important}
+    #rpDoc{position:absolute;left:0;top:0;width:100%;max-width:none;padding:0;border-radius:0}
+    .no-print{display:none!important}
+    .rp-tbl,.rp-boxes,.rp-bars{page-break-inside:avoid}
+    @page{margin:14mm}
+  }
   .qd-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:10px}
   .qd-card{padding:18px 20px}
   .qd-wrap{position:relative;height:440px;min-height:440px;max-height:440px;margin-top:8px}
@@ -574,6 +633,7 @@
       <button data-mode="dashboard" id="tabDashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>Dashboard</button>
       <button data-mode="manager" id="tabManager" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Production</button>
       <button data-mode="annotator" id="tabEpisodes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Episodes</button>
+      <button id="tabReport" data-mode="report" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>Report</button>
       <button id="tabQcAn" data-mode="qcan" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 4-6"/></svg>QC Analytics</button>
       <button id="tabQc" data-mode="qc" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>QC</button>
       <button id="tabBacklog" data-mode="backlog" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>Backlog</button>
@@ -649,7 +709,7 @@ if(!Array.isArray(state.timeEntries))state.timeEntries=[];
 if(typeof state.batchSize!=='number')state.batchSize=5;
 if(typeof state.listsVersion!=='number')state.listsVersion=0;
 if(typeof state.queueSize!=='number')state.queueSize=10;
-let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog','qc','qcan'].includes(m)?m:'dashboard';})();
+let mode=(function(){const m=sessionStorage.getItem('projectHomie.mode');return ['dashboard','manager','annotator','timelog','backlog','qc','qcan','report'].includes(m)?m:'dashboard';})();
 let openBot=null;
 const drawerOpen=new Set();       // manager drawer date groups that are EXPANDED (default collapsed)
 const drawerMonthOpen=new Set();  // manager drawer month groups EXPANDED (default collapsed)
@@ -942,18 +1002,24 @@ function countsAsFreelancerWork(e){
   if(!since)return true;
   return !!e.dateLabeled && e.dateLabeled >= since;
 }
-function isManager(){return me.role==='manager';}
+function isManager(){return me.role==='manager'&&!PUBLIC_VIEW;}
 function isFreelancer(){return me.role==='freelancer';}
 function isQC(){return me.role==='qc';}
+/* Read-only share link: ?view=public — Dashboard, Production and QC Analytics only */
+const PUBLIC_VIEW=(function(){try{
+  return new URLSearchParams(location.search).get('view')==='public';}catch(e){return false;}})();
+function isViewer(){return PUBLIC_VIEW;}
 function isFullTimeUser(){return me.role==='fulltime'||me.role==='annotator';}
 function isWorker(){return me.role==='fulltime'||me.role==='freelancer'||me.role==='annotator';}
 function applyRole(){
-  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser()||isQC())?'':'none';
+  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser()||isQC()||isViewer())?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
-  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC()||isFullTimeUser())?'':'none';
-  if(!(isManager()||isQC()||isFullTimeUser())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  const trp=document.getElementById('tabReport');if(trp)trp.style.display=isManager()?'':'none';
+  if(!isManager()&&mode==='report'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC()||isFullTimeUser()||isViewer())?'':'none';
+  if(!(isManager()||isQC()||isFullTimeUser()||isViewer())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
@@ -962,7 +1028,7 @@ function applyRole(){
   if(isFreelancer()&&!['backlog','dashboard'].includes(mode)){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
-  if(!(isManager()||isFullTimeUser()||isQC())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(!(isManager()||isFullTimeUser()||isQC()||isViewer())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isFreelancer()&&mode==='timelog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isQC()){   /* QC: QC + QC Analytics + Dashboard + Time Log + Production (view only) */
     ['tabEpisodes','tabBacklog','btnSettings'].forEach(function(id){
@@ -970,6 +1036,13 @@ function applyRole(){
     ['tabQc','tabQcAn','tabDashboard','tabTimelog','tabManager'].forEach(function(id){
       const el=document.getElementById(id);if(el)el.style.display='';});
     if(!['qc','qcan','dashboard','timelog','manager'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
+  }
+  if(isViewer()){
+    ['tabEpisodes','tabBacklog','tabTimelog','tabQc','btnSettings','btnSignOut','userChip','shiftBadge']
+      .forEach(function(id){const el=document.getElementById(id);if(el)el.style.display='none';});
+    ['tabDashboard','tabManager','tabQcAn'].forEach(function(id){
+      const el=document.getElementById(id);if(el)el.style.display='';});
+    if(!['dashboard','manager','qcan'].includes(mode)){mode='dashboard';}
   }
   document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));
 }
@@ -1238,7 +1311,11 @@ async function cloudPoll(){
           const cur=idx.get(inc.id);
           if(!cur){state.timeEntries.push(inc);idx.set(inc.id,inc);syncedTimes.set(inc.id,timeSig(inc));dirty=true;}
           else{const pending=timeSig(cur)!==syncedTimes.get(cur.id);
-            if(!pending&&timeSig(cur)!==timeSig(inc)){Object.assign(cur,inc);dirty=true;}
+            /* A shift that is CLOSED on the server is a fact, not a negotiation.
+               Always accept it, even if this browser thinks it has a local edit —
+               otherwise a stale copy keeps showing "not clocked out" forever. */
+            const serverClosed=!!inc.end&&!cur.end;
+            if((!pending||serverClosed)&&timeSig(cur)!==timeSig(inc)){Object.assign(cur,inc);dirty=true;}
             syncedTimes.set(inc.id,timeSig(inc));}
         }
       }
@@ -1757,7 +1834,11 @@ function renderDashboard(){
   const n=S.M.data.length;const trend=n>=2?(S.M.data[n-1]<S.M.data[n-2]?'↓ Declining':'↑ Improving'):'';
   const ps=(l,v)=>`<div class="ps"><div class="psl">${l}</div><div class="psv">${v}</div></div>`;
   app.innerHTML=`
-   <div class="dash-top"><h2>DASHBOARD</h2><input type="date" id="dashDate" value="${day}"></div>
+   <div class="dash-top"><h2>DASHBOARD</h2>
+     <span class="dash-tools">
+       ${isManager()?'<button id="btnWeekReport" title="Weekly report for the selected week">Weekly report</button>':''}
+       <input type="date" id="dashDate" value="${day}">
+     </span></div>
    <div class="stats">
      <div class="stat" style="--sc:var(--acc)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span><div class="k">Completed</div><div class="v">${o.done.toLocaleString()}</div><div class="sub">episodes done</div></div>
      <div class="stat" style="--sc:var(--amber)"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></span><div class="k">Remaining</div><div class="v">${o.pending.toLocaleString()}</div><div class="sub">pending</div></div>
@@ -1837,6 +1918,8 @@ function renderDashboard(){
       :'<div class="an-row"><div class="hint">No freelancers in the roster</div></div>'}
    </div>`;
   app.querySelector('#dashDate').addEventListener('change',e=>{dashDate=e.target.value;renderDashboard();});
+  const wrb=app.querySelector('#btnWeekReport');
+  if(wrb)wrb.addEventListener('click',()=>openWeeklyReport());
   destroyCharts();
   if(typeof Chart!=='undefined'){
     const c1=document.getElementById('cv-wperf');
@@ -2057,8 +2140,9 @@ function renderThrottled(){
   clearTimeout(_deferTimer);
   _deferTimer=setTimeout(render,45000-since);
 }
-function render(){ if(mode==='dashboard'||mode==='qcan')_lastChartRender=Date.now();
-  if(isQC()&&!['qc','qcan','dashboard','timelog','manager'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else renderAnnotator(); }
+function render(){ if(isViewer()&&!['dashboard','manager','qcan'].includes(mode))mode='dashboard';
+  if(mode==='dashboard'||mode==='qcan')_lastChartRender=Date.now();
+  if(isQC()&&!['qc','qcan','dashboard','timelog','manager'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else if(mode==='report')renderReport(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
 function renderManager(){
@@ -2959,6 +3043,522 @@ function renderQCAnalytics(){
   if(dd)dd.addEventListener('change',e=>{dashDate=e.target.value||todayISO();renderQCAnalytics();});
 }
 
+/* ---------- Weekly report ---------- */
+/* People who have left. Cleaner long-term: change their profile role in
+   Supabase so they drop out of fulltimeNames() automatically. */
+const REPORT_EXCLUDE=new Set(['Sean']);
+let repWeek='';                       /* Monday of the week being reported */
+
+function repMonday(iso){return isoWeekRange(iso)[0];}
+function repShift(mondayISO,weeks){
+  const p=mondayISO.split('-').map(Number);
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  d.setUTCDate(d.getUTCDate()+weeks*7);
+  return d.toISOString().slice(0,10);
+}
+function repRange(mondayISO){
+  const p=mondayISO.split('-').map(Number);
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  d.setUTCDate(d.getUTCDate()+6);
+  return [mondayISO,d.toISOString().slice(0,10)];
+}
+function repWeekNum(mondayISO){
+  const p=mondayISO.split('-').map(Number);
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  const y0=new Date(Date.UTC(p[0],0,1));
+  return Math.floor((d-y0)/(7*86400000))+1;
+}
+function repTeam(){
+  return fulltimeNames().filter(n=>!REPORT_EXCLUDE.has(n)).sort();
+}
+function repIn(d,r){return !!d && d>=r[0] && d<=r[1];}
+
+/* everything the report needs for one week */
+function repStats(mondayISO){
+  const R=repRange(mondayISO), team=repTeam();
+  const inTeam=n=>team.includes(n);
+
+  const doneIn = state.episodes.filter(e=>e.done&&inTeam(e.assignee)&&repIn(e.dateLabeled,R));
+  const eps = doneIn.length;
+  let mins=0;
+  state.timeEntries.forEach(t=>{if(inTeam(t.person)&&repIn(t.day,R))mins+=t.minutes||0;});
+  const hrs = mins/60;
+
+  /* QC reviewed in this week, by check date */
+  const rev = state.episodes.filter(e=>e.done&&e.qcChecked&&inTeam(e.assignee)
+                                   &&repIn(qcDay(e),R));
+  const revErr = rev.filter(qcHasError).length;
+  const codeCount = rev.reduce((s,e)=>s+qcErrCount(e),0);
+
+  /* per annotator */
+  const per={};
+  team.forEach(p=>{per[p]={rev:0,err:0,eps:0,hrs:0,reasons:{}};});
+  rev.forEach(e=>{const o=per[e.assignee];if(!o)return;o.rev++;
+    if(qcHasError(e)){o.err++;}
+    (e.qcErrors||[]).forEach(m=>(m.codes||[]).forEach(c=>{
+      const cd=qcCodeOf(c);if(!cd)return;o.reasons[cd]=(o.reasons[cd]||0)+1;}));});
+  doneIn.forEach(e=>{if(per[e.assignee])per[e.assignee].eps++;});
+  state.timeEntries.forEach(t=>{if(per[t.person]&&repIn(t.day,R))per[t.person].hrs+=(t.minutes||0)/60;});
+  Object.keys(per).forEach(p=>{const o=per[p];
+    o.rate=o.rev?Math.round(o.err/o.rev*10000)/100:0;
+    o.eph=o.hrs>0?Math.round(o.eps/o.hrs*100)/100:0;});
+
+  /* KPI bonus + weekly backlog released */
+  let bonus=0;
+  const days=[...new Set(doneIn.map(e=>e.dateLabeled))];
+  days.forEach(d=>team.forEach(p=>{
+    const n=doneIn.filter(e=>e.assignee===p&&e.dateLabeled===d).length;
+    if(n>21)bonus+=n-21;}));
+  const weeklyBacklog = state.episodes.filter(e=>e.status==='backlog'&&repIn(e.recordingDate||e.dateLabeled,R)).length;
+
+  /* QC coverage: bot-dates QC touched this week, and all episodes on them */
+  const touched=new Set(rev.map(e=>e.bot+'|'+e.dateLabeled));
+  const scope=state.episodes.filter(e=>e.done&&inTeam(e.assignee)&&e.dateLabeled
+                                    &&touched.has(e.bot+'|'+e.dateLabeled));
+  const covRev=scope.filter(e=>e.qcChecked).length;
+  const byQc={};
+  rev.forEach(e=>{const q=(e.qcName||'—').trim()||'—';
+    const o=byQc[q]||(byQc[q]={dates:new Set(),rev:0});
+    o.dates.add(e.bot+'|'+e.dateLabeled);o.rev++;});
+
+  /* error reason totals */
+  const reasons={};
+  rev.forEach(e=>(e.qcErrors||[]).forEach(m=>(m.codes||[]).forEach(c=>{
+    const cd=qcCodeOf(c);if(!cd)return;reasons[cd]=(reasons[cd]||0)+1;})));
+  const reasonList=Object.keys(reasons).map(c=>({code:c,label:qcReasonLabel(c),
+      color:qcReasonColor(c),n:reasons[c],
+      pct:codeCount?Math.round(reasons[c]/codeCount*100):0}))
+    .sort((a,b)=>b.n-a.n);
+
+  return {range:R, week:repWeekNum(mondayISO), team, eps, hrs,
+          eph:hrs>0?Math.round(eps/hrs*100)/100:0,
+          rate:rev.length?Math.round(revErr/rev.length*10000)/100:0,
+          reviewed:rev.length, errors:codeCount, revErr,
+          per, bonus, weeklyBacklog,
+          coverage:{episodes:scope.length,reviewed:covRev,
+                    unreviewed:scope.length-covRev,
+                    dates:touched.size,
+                    pct:scope.length?Math.round(covRev/scope.length*10000)/100:0},
+          byQc, reasons:reasonList};
+}
+function repBacklogSnapshot(){
+  const total=state.episodes.filter(e=>!e.isNew&&(e.status==='backlog'||e.qcCleared)).length;
+  const remaining=state.episodes.filter(e=>e.status==='backlog'&&!e.done
+                    &&!(e.assignee||'').trim()).length;
+  const held=state.episodes.filter(e=>!e.done&&(e.assignee||'').trim()
+                    &&e.status==='assigned'&&!e.isNew).length;
+  return {total:remaining+held, remaining, cleared:held};
+}
+
+function repDelta(cur,prev,lowerBetter,pct,dp){
+  const d=cur-prev;
+  if(Math.abs(d)<0.005)return '<span class="rp-flat">— 0</span>';
+  const good=lowerBetter?(d<0):(d>0);
+  const arrow=d>0?'▲':'▼';
+  const v=(d>0?'+':'')+d.toFixed(dp||0)+(pct?'%':'');
+  return '<span class="'+(good?'rp-up':'rp-down')+'">'+arrow+' '+v+'</span>';
+}
+function repMetricRows(rows){
+  return `<table class="rp-tbl rp-metric"><tr><th>METRIC</th><th>THIS WEEK</th><th></th><th>LAST WEEK</th></tr>
+    ${rows.map(r=>`<tr><td>${r[0]}</td><td class="rp-cur">${r[1]}</td><td class="rp-d">${r[3]}</td><td class="rp-prev">${r[2]}</td></tr>`).join('')}
+  </table>`;
+}
+function repRankRow(list,cols){
+  if(!list.length)return '<tr><td colspan="'+cols+'" class="rp-none">No data</td></tr>';
+  return '';
+}
+function renderReport(){
+  if(!repWeek)repWeek=repShift(repMonday(todayISO()),-1);   /* default: last full week */
+  const S=repStats(repWeek), P=repStats(repShift(repWeek,-1));
+  const B=repBacklogSnapshot();
+  const team=S.team;
+  const fmtD=iso=>{const p=iso.split('-').map(Number);
+    return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][p[1]-1]+' '+p[2];};
+  const withRev=team.filter(p=>S.per[p].rev>0);
+  const hi=[...withRev].sort((a,b)=>S.per[b].rate-S.per[a].rate||S.per[b].err-S.per[a].err).slice(0,3);
+  const lo=[...withRev].sort((a,b)=>S.per[a].rate-S.per[b].rate||S.per[b].rev-S.per[a].rev).slice(0,3);
+  const withEph=team.filter(p=>S.per[p].hrs>0&&S.per[p].eps>0);
+  const fast=[...withEph].sort((a,b)=>S.per[b].eph-S.per[a].eph).slice(0,3);
+  const slow=[...withEph].sort((a,b)=>S.per[a].eph-S.per[b].eph).slice(0,3);
+  const reasonsOf=p=>{const r=S.per[p].reasons;
+    return Object.keys(r).sort((a,b)=>r[b]-r[a])
+      .map(c=>qcReasonLabel(c)+' ('+r[c]+')').join(', ')||'—';};
+
+  app.innerHTML=`
+  <div class="rp-bar no-print">
+    <button class="btn btn-sm" id="rpPrev">‹ Previous week</button>
+    <span class="rp-wk">${fmtD(S.range[0])} – ${fmtD(S.range[1])} · Week ${S.week}</span>
+    <button class="btn btn-sm" id="rpNext" ${repWeek>=repShift(repMonday(todayISO()),-1)?'disabled':''}>Next week ›</button>
+    <button class="btn btn-sm btn-req" id="rpPrint">Download PDF</button>
+  </div>
+
+  <div class="rp-doc" id="rpDoc">
+    <div class="rp-head">
+      <div class="rp-title">PROJECT HOMIE</div>
+      <div class="rp-sub">WEEKLY REPORT · ANNOTATION &amp; QC</div>
+      <div class="rp-date">${fmtD(S.range[0])} – ${fmtD(S.range[1])}, ${S.range[0].slice(0,4)} · Week ${S.week} (Mon–Sun)</div>
+    </div>
+
+    <div class="rp-h2 rp-h2-a">ANNOTATION TEAM SUMMARY</div>
+    ${repMetricRows([
+      ['Episodes Annotated',S.eps.toLocaleString(),P.eps.toLocaleString(),repDelta(S.eps,P.eps,false,false,0)],
+      ['Hours',S.hrs.toFixed(1),P.hrs.toFixed(1),repDelta(S.hrs,P.hrs,false,false,1)],
+      ['Avg EPH',S.eph.toFixed(2),P.eph.toFixed(2),repDelta(S.eph,P.eph,false,false,2)],
+      ['Weekly Error Rate (QC)',S.rate.toFixed(2)+'%',P.rate.toFixed(2)+'%',repDelta(S.rate,P.rate,true,true,2)]
+    ])}
+
+    <div class="rp-h2 rp-h2-b">BACKLOG</div>
+    <div class="rp-boxes">
+      <div class="rp-box"><div class="rp-bv">${B.total.toLocaleString()}</div><div class="rp-bl">TOTAL BACKLOGS</div></div>
+      <div class="rp-box rp-ok"><div class="rp-bv">${B.cleared.toLocaleString()}</div><div class="rp-bl">BEING WORKED</div></div>
+      <div class="rp-box ${B.remaining?'rp-warn':'rp-ok'}"><div class="rp-bv">${B.remaining.toLocaleString()}</div><div class="rp-bl">REMAINING BACKLOG</div></div>
+    </div>
+    ${repMetricRows([
+      ['Weekly Backlog',S.weeklyBacklog.toLocaleString(),P.weeklyBacklog.toLocaleString(),repDelta(S.weeklyBacklog,P.weeklyBacklog,true,false,0)],
+      ['Weekly KPI Bonus',S.bonus.toLocaleString(),P.bonus.toLocaleString(),repDelta(S.bonus,P.bonus,false,false,0)]
+    ])}
+
+    <div class="rp-h3 rp-red">■ Top 3 Highest Error Rate — needs attention</div>
+    <table class="rp-tbl"><tr><th>ANNOTATOR</th><th>ERROR RATE</th><th>REVIEWED</th><th>ERRORS</th><th>MAIN ERROR REASONS</th></tr>
+      ${hi.length?hi.map(p=>`<tr><td class="rp-nm">${esc(p)}</td>
+        <td class="rp-c rp-bad">${S.per[p].rate.toFixed(2)}%</td>
+        <td class="rp-c">${S.per[p].rev}</td><td class="rp-c">${S.per[p].err}</td>
+        <td class="rp-sm">${esc(reasonsOf(p))}</td></tr>`).join('')
+        :'<tr><td colspan="5" class="rp-none">No QC data this week</td></tr>'}
+    </table>
+
+    <div class="rp-h3 rp-grn">■ Top 3 Lowest Error Rate — best quality</div>
+    <table class="rp-tbl"><tr><th>ANNOTATOR</th><th>ERROR RATE</th><th>REVIEWED</th><th>ERRORS</th></tr>
+      ${lo.length?lo.map(p=>`<tr><td class="rp-nm">${esc(p)}</td>
+        <td class="rp-c rp-good">${S.per[p].rate.toFixed(2)}%</td>
+        <td class="rp-c">${S.per[p].rev}</td><td class="rp-c">${S.per[p].err}</td></tr>`).join('')
+        :'<tr><td colspan="4" class="rp-none">No QC data this week</td></tr>'}
+    </table>
+
+    <div class="rp-h3 rp-grn">■ Top 3 Fastest by EPH</div>
+    <table class="rp-tbl"><tr><th>ANNOTATOR</th><th>EPH</th><th>EPISODES</th><th>HOURS</th></tr>
+      ${fast.length?fast.map(p=>`<tr><td class="rp-nm">${esc(p)}</td>
+        <td class="rp-c rp-good">${S.per[p].eph.toFixed(2)}</td>
+        <td class="rp-c">${S.per[p].eps}</td><td class="rp-c">${S.per[p].hrs.toFixed(1)}</td></tr>`).join('')
+        :'<tr><td colspan="4" class="rp-none">No data</td></tr>'}
+    </table>
+
+    <div class="rp-h3 rp-amb">■ Top 3 Slowest by EPH</div>
+    <table class="rp-tbl"><tr><th>ANNOTATOR</th><th>EPH</th><th>EPISODES</th><th>HOURS</th></tr>
+      ${slow.length?slow.map(p=>`<tr><td class="rp-nm">${esc(p)}</td>
+        <td class="rp-c rp-amber">${S.per[p].eph.toFixed(2)}</td>
+        <td class="rp-c">${S.per[p].eps}</td><td class="rp-c">${S.per[p].hrs.toFixed(1)}</td></tr>`).join('')
+        :'<tr><td colspan="4" class="rp-none">No data</td></tr>'}
+    </table>
+
+    <div class="rp-h2 rp-h2-c">QC TEAM</div>
+    ${repMetricRows([
+      ['Total Reviewed',S.reviewed.toLocaleString(),P.reviewed.toLocaleString(),repDelta(S.reviewed,P.reviewed,false,false,0)],
+      ['Total Errors',S.errors.toLocaleString(),P.errors.toLocaleString(),repDelta(S.errors,P.errors,true,false,0)],
+      ['Error Rate',S.rate.toFixed(2)+'%',P.rate.toFixed(2)+'%',repDelta(S.rate,P.rate,true,true,2)]
+    ])}
+
+    <div class="rp-h3 rp-blu">■ Weekly QC Coverage</div>
+    <table class="rp-tbl"><tr><th>REVIEWER</th><th>DATES REVIEWED</th><th>REVIEWED EPISODES</th><th>UNREVIEWED</th><th>TOTAL QC %</th></tr>
+      <tr><td class="rp-nm">Weekly Overall</td><td class="rp-c">${S.coverage.dates}</td>
+        <td class="rp-c">${S.coverage.reviewed.toLocaleString()}</td>
+        <td class="rp-c">${S.coverage.unreviewed.toLocaleString()}</td>
+        <td class="rp-c rp-amber"><b>${S.coverage.pct.toFixed(2)}%</b></td></tr>
+      ${Object.keys(S.byQc).sort().map(q=>`<tr><td>${esc(q)}</td>
+        <td class="rp-c">${S.byQc[q].dates.size}</td>
+        <td class="rp-c">${S.byQc[q].rev.toLocaleString()}</td>
+        <td class="rp-c">—</td><td class="rp-c">—</td></tr>`).join('')}
+    </table>
+
+    <div class="rp-h3 rp-blu">■ Error Breakdown — top failure reasons</div>
+    <div class="rp-bars">
+      ${S.reasons.length?S.reasons.slice(0,8).map(r=>`<div class="rp-brow">
+        <span class="rp-blbl">${esc(r.label)}</span>
+        <span class="rp-btrack"><i style="width:${r.pct}%;background:${r.color}"></i></span>
+        <span class="rp-bval">${r.pct}% (${r.n})</span></div>`).join('')
+        :'<div class="rp-none">No errors recorded this week</div>'}
+    </div>
+
+    <div class="rp-h3 rp-blu">■ Episodes Reviewed by Annotator</div>
+    <table class="rp-tbl"><tr><th>ANNOTATOR</th><th>REVIEWED</th><th>ERRORS</th><th>ERROR RATE</th></tr>
+      ${withRev.sort((a,b)=>S.per[b].rev-S.per[a].rev).map(p=>`<tr>
+        <td class="rp-nm">${esc(p)}</td><td class="rp-c">${S.per[p].rev}</td>
+        <td class="rp-c">${S.per[p].err}</td>
+        <td class="rp-c ${S.per[p].rate>10?'rp-bad':S.per[p].rate>3?'rp-amber':'rp-good'}">${S.per[p].rate.toFixed(2)}%</td></tr>`).join('')
+        ||'<tr><td colspan="4" class="rp-none">No QC data this week</td></tr>'}
+    </table>
+
+    <div class="rp-foot">Generated ${fmtD(todayISO())}, ${todayISO().slice(0,4)} · ${nowHM()}.
+      Window: Monday–Sunday. Errors are QC code-counted (core team only).
+      Backlog is a live snapshot with no week-over-week comparison.</div>
+  </div>`;
+
+  const pv=app.querySelector('#rpPrev');
+  if(pv)pv.addEventListener('click',()=>{repWeek=repShift(repWeek,-1);renderReport();});
+  const nx=app.querySelector('#rpNext');
+  if(nx)nx.addEventListener('click',()=>{if(repWeek<repShift(repMonday(todayISO()),-1)){repWeek=repShift(repWeek,1);renderReport();}});
+  const pr=app.querySelector('#rpPrint');
+  if(pr)pr.addEventListener('click',()=>window.print());
+}
+
+/* ---------- Weekly report (Mon-Sun) ---------- */
+function wkBounds(day){const r=isoWeekRange(day);return {from:r[0],to:r[1]};}
+function wkPrev(day){
+  const p=isoWeekRange(day)[0].split('-').map(Number);
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]-7));
+  return isoWeekRange(d.toISOString().slice(0,10));
+}
+function inRange(iso,a,b){return !!iso&&iso>=a&&iso<=b;}
+
+function repStats(from,to){
+  const ft=fulltimeNames();
+  const eps=state.episodes.filter(e=>e.done&&isFulltimeName(e.assignee)&&inRange(e.dateLabeled,from,to));
+  let mins=0;
+  state.timeEntries.forEach(t=>{if(isFulltimeName(t.person)&&inRange(t.day,from,to))mins+=t.minutes||0;});
+  const hrs=mins/60;
+  /* QC reviewed in this window, by check date */
+  const rev=state.episodes.filter(e=>e.done&&e.qcChecked&&isFulltimeName(e.assignee)
+              &&inRange((e.qcDate||'').slice(0,10),from,to));
+  const withErr=rev.filter(e=>qcErrCount(e)>0).length;
+  const codes=rev.reduce((s,e)=>s+qcErrCount(e),0);
+  /* per person */
+  const per={};
+  ft.forEach(p=>{per[p]={eps:0,hrs:0,rev:0,err:0,codes:{}};});
+  eps.forEach(e=>{if(per[e.assignee])per[e.assignee].eps++;});
+  state.timeEntries.forEach(t=>{if(per[t.person]&&inRange(t.day,from,to))per[t.person].hrs+=(t.minutes||0)/60;});
+  rev.forEach(e=>{const o=per[e.assignee];if(!o)return;o.rev++;
+    if(qcErrCount(e)>0)o.err++;
+    (e.qcErrors||[]).forEach(m=>(m.codes||[]).forEach(c=>{
+      const cd=qcCodeOf(c); if(cd)o.codes[cd]=(o.codes[cd]||0)+1;}));});
+  /* KPI bonus */
+  let bonus=0;
+  const days=[...new Set(eps.map(e=>e.dateLabeled))];
+  days.forEach(d=>ft.forEach(p=>{
+    const n=eps.filter(e=>e.assignee===p&&e.dateLabeled===d).length;
+    if(n>21)bonus+=n-21;}));
+  /* backlog released this week */
+  const blWeek=state.episodes.filter(e=>!e.done&&e.status==='backlog').length;
+  /* Weekly backlog = backlog work completed by FREELANCERS this week */
+  const blCleared=state.episodes.filter(e=>e.done&&countsAsFreelancerWork(e)
+                    &&inRange(e.dateLabeled,from,to)).length;
+  /* reason totals */
+  const reasons={};
+  rev.forEach(e=>(e.qcErrors||[]).forEach(m=>(m.codes||[]).forEach(c=>{
+    const cd=qcCodeOf(c); if(cd)reasons[cd]=(reasons[cd]||0)+1;})));
+  /* per QC reviewer */
+  const byQC={};
+  rev.forEach(e=>{const q=(e.qcName||'—').trim()||'—';
+    const o=byQC[q]||(byQC[q]={rev:0,dates:new Set()});
+    o.rev++; o.dates.add(e.bot+'|'+e.dateLabeled);});
+  /* coverage per reviewer: every completed episode on the bot-dates they worked */
+  Object.keys(byQC).forEach(q=>{
+    const o=byQC[q];
+    const sc=state.episodes.filter(e=>e.done&&isFulltimeName(e.assignee)&&e.dateLabeled
+              &&o.dates.has(e.bot+'|'+e.dateLabeled));
+    const r=sc.filter(e=>e.qcChecked).length;
+    o.scope=sc.length; o.covRev=r; o.un=sc.length-r;
+    o.pct=sc.length?Math.round(r/sc.length*1000)/10:0;
+  });
+  /* coverage: all completed episodes on the bot-dates QC touched */
+  const touched=new Set(rev.map(e=>e.bot+'|'+e.dateLabeled));
+  const scope=state.episodes.filter(e=>e.done&&isFulltimeName(e.assignee)&&e.dateLabeled
+                 &&touched.has(e.bot+'|'+e.dateLabeled));
+  const covRev=scope.filter(e=>e.qcChecked).length;
+  return {from,to,eps:eps.length,hrs,eph:eph(eps.length,hrs),
+    rev:rev.length,withErr,codes,
+    rate:rev.length?Math.round(withErr/rev.length*1000)/10:0,
+    per,bonus,blWeek,blCleared,reasons,byQC,
+    cov:{dates:touched.size,eps:scope.length,rev:covRev,un:scope.length-covRev,
+         pct:scope.length?Math.round(covRev/scope.length*1000)/10:0}};
+}
+
+function repDelta(cur,prev,lowerBetter,suffix,dp){
+  const d=+(cur-prev).toFixed(dp||0);
+  if(!d)return '<span class="rp-flat">— 0</span>';
+  const good=lowerBetter?d<0:d>0;
+  return `<span class="${good?'rp-up':'rp-down'}">${d>0?'▲':'▼'} ${d>0?'+':''}${d.toFixed(dp||0)}${suffix||''}</span>`;
+}
+
+function buildWeeklyReport(day){
+  const w=wkBounds(day), pw=wkPrev(day);
+  const A=repStats(w.from,w.to), B=repStats(pw[0],pw[1]);
+  const ft=fulltimeNames();
+  const nm=d=>{const x=new Date(d+'T00:00:00');
+    return x.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+  const wkNum=(()=>{const p=w.from.split('-').map(Number);
+    const s=new Date(Date.UTC(p[0],0,1)), c=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+    return Math.floor((c-s)/(7*864e5))+1;})();
+
+  const people=ft.map(p=>({p,...A.per[p]})).filter(x=>x.rev>0||x.eps>0);
+  const rated=people.filter(x=>x.rev>0)
+    .map(x=>({...x,rate:Math.round(x.err/x.rev*1000)/10}));
+  const hi=[...rated].sort((a,b)=>b.rate-a.rate||b.err-a.err).slice(0,3);
+  const lo=[...rated].sort((a,b)=>a.rate-b.rate||b.rev-a.rev).slice(0,3);
+  const ephs=people.filter(x=>x.hrs>0&&x.eps>0)
+    .map(x=>({...x,e:eph(x.eps,x.hrs)}));
+  const fast=[...ephs].sort((a,b)=>b.e-a.e).slice(0,3);
+  const slow=[...ephs].sort((a,b)=>a.e-b.e).slice(0,3);
+  const reasonList=Object.entries(A.reasons).sort((a,b)=>b[1]-a[1]);
+  const totCodes=reasonList.reduce((s,r)=>s+r[1],0)||1;
+  const mainReasons=x=>Object.entries(x.codes||{}).sort((a,b)=>b[1]-a[1])
+    .map(([c,n])=>qcReasonLabel(c)+' ('+n+')').join(', ')||'—';
+
+  const row=(cells,cls)=>`<tr class="${cls||''}">${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`;
+  const mrow=(label,cur,prev,d)=>row([label,`<b>${cur}</b>`,d,`<span class="rp-prev">${prev}</span>`]);
+
+  return `
+  <div class="rp-doc">
+    <div class="rp-head">
+      <div class="rp-brand">PROJECT HOMIE</div>
+      <div class="rp-kicker">WEEKLY REPORT · ANNOTATION &amp; QC</div>
+      <div class="rp-range">${nm(w.from)} – ${nm(w.to)}, ${w.to.slice(0,4)} · Week ${wkNum} (Mon–Sun)</div>
+    </div>
+
+    <div class="rp-h2 rp-teal">ANNOTATION TEAM SUMMARY</div>
+    <table class="rp-t rp-metric h-teal"><thead><tr><th>METRIC</th><th>THIS WEEK</th><th></th><th>LAST WEEK</th></tr></thead><tbody>
+      ${mrow('Episodes Annotated',A.eps.toLocaleString(),B.eps.toLocaleString(),repDelta(A.eps,B.eps))}
+      ${mrow('Hours',A.hrs.toFixed(1),B.hrs.toFixed(1),repDelta(A.hrs,B.hrs,false,'',1))}
+      ${mrow('Avg EPH',A.eph.toFixed(2),B.eph.toFixed(2),repDelta(A.eph,B.eph,false,'',2))}
+      ${mrow('Weekly Error Rate (QC)',A.rate+'%',B.rate+'%',repDelta(A.rate,B.rate,true,'%',2))}
+    </tbody></table>
+
+    <div class="rp-h2 rp-amber">BACKLOG AND KPI</div>
+    <div class="rp-boxes">
+      <div class="rp-box rp-ok"><div class="rp-bv">${A.blCleared.toLocaleString()}</div><div class="rp-bl">CLEARED BACKLOG</div></div>
+      <div class="rp-box"><div class="rp-bv">${A.blWeek.toLocaleString()}</div><div class="rp-bl">REMAINING BACKLOG</div></div>
+    </div>
+    <table class="rp-t rp-metric h-amber" style="margin-top:8px"><thead><tr><th>METRIC</th><th>THIS WEEK</th><th></th><th>LAST WEEK</th></tr></thead><tbody>
+      ${mrow('Weekly Backlog',A.blCleared.toLocaleString(),B.blCleared.toLocaleString(),repDelta(A.blCleared,B.blCleared))}
+      ${mrow('Weekly KPI Bonus',A.bonus.toLocaleString(),B.bonus.toLocaleString(),repDelta(A.bonus,B.bonus))}
+    </tbody></table>
+
+    <div class="rp-h3 rp-red">■ Top 3 Highest Error Rate — needs attention</div>
+    <table class="rp-t h-red"><thead><tr><th>ANNOTATOR</th><th>ERROR RATE</th><th>REVIEWED</th><th>ERRORS</th><th>MAIN ERROR REASONS</th></tr></thead><tbody>
+      ${hi.length?hi.map(x=>row([`<b>${esc(x.p)}</b>`,`<b class="rp-bad">${x.rate}%</b>`,x.rev,x.err,
+        `<span class="rp-sm">${esc(mainReasons(x))}</span>`])).join(''):row(['<span class="rp-sm">No QC data this week</span>','','','',''])}
+    </tbody></table>
+
+    <div class="rp-h3 rp-green">■ Top 3 Lowest Error Rate — best quality</div>
+    <table class="rp-t h-green"><thead><tr><th>ANNOTATOR</th><th>ERROR RATE</th><th>REVIEWED</th><th>ERRORS</th></tr></thead><tbody>
+      ${lo.length?lo.map(x=>row([`<b>${esc(x.p)}</b>`,`<b class="rp-good">${x.rate}%</b>`,x.rev,x.err])).join(''):row(['<span class="rp-sm">No QC data</span>','','',''])}
+    </tbody></table>
+
+    <div class="rp-h3 rp-green">■ Top 3 Fastest by EPH</div>
+    <table class="rp-t h-green"><thead><tr><th>ANNOTATOR</th><th>EPH</th><th>EPISODES</th><th>HOURS</th></tr></thead><tbody>
+      ${fast.map(x=>row([`<b>${esc(x.p)}</b>`,`<b class="rp-good">${x.e.toFixed(2)}</b>`,x.eps,x.hrs.toFixed(1)])).join('')||row(['<span class="rp-sm">No data</span>','','',''])}
+    </tbody></table>
+
+    <div class="rp-h3 rp-amber-t">■ Top 3 Slowest by EPH</div>
+    <table class="rp-t h-amber"><thead><tr><th>ANNOTATOR</th><th>EPH</th><th>EPISODES</th><th>HOURS</th></tr></thead><tbody>
+      ${slow.map(x=>row([`<b>${esc(x.p)}</b>`,`<b class="rp-warn">${x.e.toFixed(2)}</b>`,x.eps,x.hrs.toFixed(1)])).join('')||row(['<span class="rp-sm">No data</span>','','',''])}
+    </tbody></table>
+
+    <div class="rp-h2 rp-blue">QC TEAM</div>
+    <table class="rp-t rp-metric h-blue"><thead><tr><th>METRIC</th><th>THIS WEEK</th><th></th><th>LAST WEEK</th></tr></thead><tbody>
+      ${mrow('Total Reviewed',A.rev.toLocaleString(),B.rev.toLocaleString(),repDelta(A.rev,B.rev))}
+      ${mrow('Total Errors',A.codes.toLocaleString(),B.codes.toLocaleString(),repDelta(A.codes,B.codes,true))}
+      ${mrow('Error Rate',A.rate+'%',B.rate+'%',repDelta(A.rate,B.rate,true,'%',2))}
+    </tbody></table>
+
+    <div class="rp-h3 rp-blue-t">■ Weekly QC Coverage</div>
+    <table class="rp-t h-blue"><thead><tr><th>REVIEWER</th><th>DATES REVIEWED</th><th>REVIEWED EPISODES</th><th>UNREVIEWED</th><th>TOTAL QC %</th></tr></thead><tbody>
+      ${row([`<b>Weekly Overall</b>`,A.cov.dates,A.cov.rev,A.cov.un,`<b>${A.cov.pct}%</b>`])}
+      ${Object.entries(A.byQC).sort((a,b)=>b[1].rev-a[1].rev).map(([q,o])=>
+        row([esc(q),o.dates.size,o.rev,o.un,
+          `<b class="${o.pct>=90?'rp-good':o.pct>=60?'rp-warn':'rp-bad'}">${o.pct}%</b>`])).join('')}
+    </tbody></table>
+
+    <div class="rp-h3 rp-blue-t">■ Error Breakdown — top failure reasons</div>
+    <div class="rp-bars">
+      ${reasonList.slice(0,8).map(([c,n])=>{const pct=Math.round(n/totCodes*100);
+        return `<div class="rp-bar"><span class="rp-bn">${esc(qcReasonLabel(c))}</span>
+          <span class="rp-bt"><i style="width:${Math.max(2,pct)}%;background:${qcReasonColor(c)}"></i></span>
+          <span class="rp-bv2"><b>${pct}%</b> (${n})</span></div>`;}).join('')
+        ||'<div class="rp-sm">No errors recorded this week</div>'}
+    </div>
+
+    <div class="rp-h3 rp-blue-t">■ Episodes Reviewed by Annotator</div>
+    <table class="rp-t h-blue"><thead><tr><th>ANNOTATOR</th><th>REVIEWED</th><th>ERRORS</th><th>ERROR RATE</th></tr></thead><tbody>
+      ${rated.sort((a,b)=>b.rev-a.rev).map(x=>row([esc(x.p),x.rev,x.err,
+        `<b class="${x.rate>=10?'rp-bad':x.rate>=3?'rp-warn':'rp-good'}">${x.rate}%</b>`])).join('')
+        ||row(['<span class="rp-sm">No QC data</span>','','',''])}
+    </tbody></table>
+
+    <div class="rp-foot">Generated ${new Date().toLocaleString()}. Window: Monday–Sunday.
+      Full-time annotators only. Errors are QC code-counted.</div>
+  </div>`;
+}
+
+function openWeeklyReport(){
+  const html=buildWeeklyReport(dashDate);
+  const wk=isoWeekRange(dashDate);
+  /* A blob URL gives the tab a real document, so the print header shows a proper
+     name instead of "about:blank". */
+  const title='Project Homie Weekly Report '+wk[0]+' to '+wk[1];
+  const doc='<!doctype html><html><head><meta charset="utf-8"><title>'+title+
+    '</title><style>'+REPORT_CSS+'</style></head><body>'+html+
+    '<div class="rp-actions">'+
+      '<button onclick="window.print()">Save as PDF / Print</button>'+
+    '</div></body></html>';
+  const url=URL.createObjectURL(new Blob([doc],{type:'text/html'}));
+  const w=window.open(url,'_blank');
+  if(!w){URL.revokeObjectURL(url);toast('Allow pop-ups to open the report');return;}
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+const REPORT_CSS=`
+ *{box-sizing:border-box}
+ body{margin:0;padding:26px 30px;background:#fff;color:#111827;
+   font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:11px}
+ .rp-doc{max-width:780px;margin:0 auto}
+ .rp-brand{font-size:23px;font-weight:800;letter-spacing:.5px}
+ .rp-kicker{font-size:11px;font-weight:800;color:#0e9f6e;letter-spacing:1px;margin-top:1px}
+ .rp-range{font-size:11px;color:#9ca3af;margin-top:2px}
+ .rp-head{border-bottom:2px solid #0e9f6e;padding-bottom:7px;margin-bottom:4px}
+ .rp-h2{color:#fff;font-weight:800;font-size:12.5px;letter-spacing:.4px;
+   padding:6px 9px;border-radius:4px;margin:15px 0 7px}
+ .rp-teal{background:#0f766e}.rp-amber{background:#b45309}.rp-blue{background:#1d4ed8}
+ .rp-h3{font-weight:800;font-size:11.5px;margin:13px 0 5px}
+ .rp-red{color:#dc2626}.rp-green{color:#0e9f6e}.rp-amber-t{color:#b45309}.rp-blue-t{color:#1d4ed8}
+ table.rp-t{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;font-size:10.5px}
+ .rp-t th{background:#eef2f5;color:#374151;font-size:9px;letter-spacing:.3px;
+   text-align:center;padding:6px 7px;border-bottom:2px solid #cbd5e1}
+ .rp-t.h-teal  th{background:#0f766e;color:#fff;border-bottom-color:#0f766e}
+ .rp-t.h-amber th{background:#b45309;color:#fff;border-bottom-color:#b45309}
+ .rp-t.h-blue  th{background:#1d4ed8;color:#fff;border-bottom-color:#1d4ed8}
+ .rp-t.h-red   th{background:#dc2626;color:#fff;border-bottom-color:#dc2626}
+ .rp-t.h-green th{background:#0e9f6e;color:#fff;border-bottom-color:#0e9f6e}
+ .rp-t th:first-child,.rp-t td:first-child{text-align:left}
+ .rp-t td{padding:5px 7px;text-align:center;border-bottom:1px solid #f1f2f4}
+ .rp-t tbody tr:nth-child(even){background:#f8fafc}
+ .rp-t tbody tr:hover{background:#f1f5f9}
+ .rp-metric tbody td:first-child{font-weight:600}
+ .rp-metric td:nth-child(2),.rp-metric td:nth-child(3),.rp-metric td:nth-child(4){text-align:right}
+ .rp-prev{color:#9ca3af}
+ .rp-up{color:#0e9f6e;font-weight:700}.rp-down{color:#dc2626;font-weight:700}.rp-flat{color:#9ca3af}
+ .rp-good{color:#0e9f6e}.rp-bad{color:#dc2626}.rp-warn{color:#b45309}
+ .rp-sm{color:#4b5563;font-size:9.5px}
+ .rp-boxes{display:flex;gap:8px}
+ .rp-box{flex:1;border:1px solid #e5e7eb;border-radius:6px;padding:10px;text-align:center}
+ .rp-box.rp-ok{border-color:#0e9f6e;background:#ecfdf5}
+ .rp-bv{font-size:26px;font-weight:800}
+ .rp-bl{font-size:8.5px;font-weight:800;color:#9ca3af;letter-spacing:.5px;margin-top:2px}
+ .rp-bars{border:1px solid #e5e7eb;border-radius:6px;padding:9px 11px}
+ .rp-bar{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:10.5px}
+ .rp-bn{width:170px;flex:none}
+ .rp-bt{flex:1;background:#eef2f5;height:11px;border-radius:4px;overflow:hidden}
+ .rp-bt i{display:block;height:100%}
+ .rp-bv2{width:80px;text-align:right;flex:none}
+ .rp-foot{margin-top:16px;padding-top:10px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:9px}
+ .rp-actions{max-width:780px;margin:18px auto 0;text-align:center}
+ .rp-actions button{background:#0e9f6e;color:#fff;border:0;border-radius:8px;
+   padding:11px 24px;font-weight:800;font-size:13px;cursor:pointer}
+ @media print{
+   @page{size:letter;margin:12mm 12mm 12mm 12mm}
+   .rp-actions{display:none}
+   body{padding:0}
+ }
+`;
+
 /* ---------- Annotator ---------- */
 function renderAnnotator(){
   keepTreeScroll('anno');
@@ -3127,6 +3727,21 @@ async function enterApp(){
     if(!document.hidden){lastActivity=Date.now();cloudPoll();}
     schedulePoll();});
 }
+async function enterPublicView(){
+  showBoot();
+  me={role:'viewer',name:'Viewer'};
+  try{ await cloudLoad(); setSyncStatus('synced'); }
+  catch(e){ setSyncStatus('error',e.message); }
+  await fetchRoster();
+  applyRole();
+  mode='dashboard';
+  render();
+  startWallClock();
+  hideBoot();
+  setTimeout(backgroundLoadOlder,1500);
+  refreshServerTotals(true);
+  setInterval(()=>refreshServerTotals(false),60000);
+}
 function showLogin(){
   hideBoot();
   const ls=document.getElementById('loginScreen');ls.style.display='';
@@ -3152,6 +3767,7 @@ function showLogin(){
     me={role:'manager',name:'Local'};applyRole();
     render(); startWallClock(); hideBoot(); return;
   }
+  if(PUBLIC_VIEW){ await enterPublicView(); return; }
   if(session&&await ensureFreshSession()){ await enterApp(); }
   else { session=null; saveSession(); showLogin(); }
 })();
