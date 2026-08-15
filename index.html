@@ -857,7 +857,7 @@ function verifyTotals(){
   return rows;
 }
 async function refreshServerTotals(force){
-  if(!CLOUD||(!session&&!PUBLIC_VIEW))return;
+  if(!CLOUD||!session)return;
   if(!force&&Date.now()-srvTotalsAt<60000)return;   /* at most once a minute */
   try{
     const [bt,pt]=await Promise.all([sbRpc('bot_totals',{}),sbRpc('person_totals',{})]);
@@ -955,7 +955,7 @@ const FULLTIME_FALLBACK=['Alwin','Ata','Axl','Cris','Kent','Mark Aaron','Darius'
 let roleMap={};   // { "Darius":"fulltime", "Ace":"freelancer", ... }
 let prefBot={};   // { "Darius":"Alpha", ... }
 async function fetchRoster(){
-  if(!CLOUD||(!session&&!PUBLIC_VIEW))return;
+  if(!CLOUD||!session)return;
   try{
     const r=await sbFetch('profiles?select=display_name,role,preferred_bot',{headers:sbHeaders()});
     const j=await r.json();
@@ -1002,22 +1002,18 @@ function countsAsFreelancerWork(e){
   if(!since)return true;
   return !!e.dateLabeled && e.dateLabeled >= since;
 }
-function isManager(){return me.role==='manager'&&!PUBLIC_VIEW;}
+function isManager(){return me.role==='manager';}
 function isFreelancer(){return me.role==='freelancer';}
 function isQC(){return me.role==='qc';}
-/* Read-only share link: ?view=public — Dashboard, Production and QC Analytics only */
-const PUBLIC_VIEW=(function(){try{
-  return new URLSearchParams(location.search).get('view')==='public';}catch(e){return false;}})();
-function isViewer(){return PUBLIC_VIEW;}
 function isFullTimeUser(){return me.role==='fulltime'||me.role==='annotator';}
 function isWorker(){return me.role==='fulltime'||me.role==='freelancer'||me.role==='annotator';}
 function applyRole(){
-  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser()||isQC()||isViewer())?'':'none';
+  const tm=document.getElementById('tabManager');if(tm)tm.style.display=(isManager()||isFullTimeUser()||isQC())?'':'none';
   const gs=document.getElementById('btnSettings');if(gs)gs.style.display=isManager()?'':'none';
   const tt=document.getElementById('tabTimelog');if(tt)tt.style.display=isFreelancer()?'none':'';
   const tqc=document.getElementById('tabQc');if(tqc)tqc.style.display=(isManager()||isQC())?'':'none';
-  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC()||isFullTimeUser()||isViewer())?'':'none';
-  if(!(isManager()||isQC()||isFullTimeUser()||isViewer())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  const tqa=document.getElementById('tabQcAn');if(tqa)tqa.style.display=(isManager()||isQC()||isFullTimeUser())?'':'none';
+  if(!(isManager()||isQC()||isFullTimeUser())&&mode==='qcan'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(!(isManager()||isQC())&&mode==='qc'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   const tbk=document.getElementById('tabBacklog');if(tbk)tbk.style.display=(isManager()||isFreelancer())?'':'none';
   const tep=document.getElementById('tabEpisodes');if(tep)tep.style.display=isFreelancer()?'none':'';
@@ -1026,7 +1022,7 @@ function applyRole(){
   if(isFreelancer()&&!['backlog','dashboard'].includes(mode)){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   const uc=document.getElementById('userChip');
   if(uc&&session){uc.style.display='';document.getElementById('userName').textContent=me.name;document.getElementById('userRole').textContent=me.role;}
-  if(!(isManager()||isFullTimeUser()||isQC()||isViewer())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
+  if(!(isManager()||isFullTimeUser()||isQC())&&mode==='manager'){mode='dashboard';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isFreelancer()&&mode==='timelog'){mode='backlog';sessionStorage.setItem('projectHomie.mode',mode);}
   if(isQC()){   /* QC: QC + QC Analytics + Dashboard + Time Log + Production (view only) */
     ['tabEpisodes','tabBacklog','btnSettings'].forEach(function(id){
@@ -1034,13 +1030,6 @@ function applyRole(){
     ['tabQc','tabQcAn','tabDashboard','tabTimelog','tabManager'].forEach(function(id){
       const el=document.getElementById(id);if(el)el.style.display='';});
     if(!['qc','qcan','dashboard','timelog','manager'].includes(mode)){mode='qc';sessionStorage.setItem('projectHomie.mode',mode);}
-  }
-  if(isViewer()){
-    ['tabEpisodes','tabBacklog','tabTimelog','tabQc','btnSettings','btnSignOut','userChip','shiftBadge']
-      .forEach(function(id){const el=document.getElementById(id);if(el)el.style.display='none';});
-    ['tabDashboard','tabManager','tabQcAn'].forEach(function(id){
-      const el=document.getElementById(id);if(el)el.style.display='';});
-    if(!['dashboard','manager','qcan'].includes(mode)){mode='dashboard';}
   }
   document.querySelectorAll('#modeswitch button').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));
 }
@@ -1105,7 +1094,7 @@ function mergeLoadedRows(rows){
 /* load anything older than the window, quietly, after the app is usable */
 let _bgLoaded=false,_bgLoading=false;
 async function backgroundLoadOlder(){
-  if(_bgLoaded||_bgLoading||!CLOUD||(!session&&!PUBLIC_VIEW))return; _bgLoading=true;
+  if(_bgLoaded||_bgLoading||!CLOUD||!session)return; _bgLoading=true;
   try{
     const rows=await cloudLoadRange('0000-01-01',windowStartISO());
     const n=mergeLoadedRows(rows);
@@ -1170,7 +1159,6 @@ async function cloudPushMeta(){
 function scheduleCloudSync(){if(!CLOUD)return;clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,700);}
 async function cloudFlush(){
   if(!CLOUD||!SB)return;
-  if(PUBLIC_VIEW)return;   /* the shared view is strictly read-only */
   if(polling){clearTimeout(syncTimer);syncTimer=setTimeout(cloudFlush,500);return;}
   if(syncing){syncQueued=true;return;}
   syncing=true;setSyncStatus('sync');
@@ -1253,7 +1241,7 @@ function schedulePoll(){
 }
 function startAdaptivePoll(){schedulePoll();}
 async function cloudPoll(){
-  if(!CLOUD||(!session&&!PUBLIC_VIEW)||pollDisabled||polling||syncing)return;
+  if(!CLOUD||!session||pollDisabled||polling||syncing)return;
   polling=true;
   try{
     let dirty=false;
@@ -2139,8 +2127,7 @@ function renderThrottled(){
   clearTimeout(_deferTimer);
   _deferTimer=setTimeout(render,45000-since);
 }
-function render(){ if(isViewer()&&!['dashboard','manager','qcan'].includes(mode))mode='dashboard';
-  if(mode==='dashboard'||mode==='qcan')_lastChartRender=Date.now();
+function render(){ if(mode==='dashboard'||mode==='qcan')_lastChartRender=Date.now();
   if(isQC()&&!['qc','qcan','dashboard','timelog','manager'].includes(mode))mode='qc'; if(isFreelancer()&&mode==='timelog')mode='backlog'; if(!(isManager()||isFreelancer())&&mode==='backlog')mode='dashboard'; if(mode==='dashboard')renderDashboard(); else if(mode==='manager')renderManager(); else if(mode==='timelog')renderTimeLog(); else if(mode==='backlog')renderBacklog(); else if(mode==='qc')renderQC(); else if(mode==='qcan')renderQCAnalytics(); else if(mode==='report')renderReport(); else renderAnnotator(); }
 
 /* ---------- Manager ---------- */
@@ -3726,25 +3713,6 @@ async function enterApp(){
     if(!document.hidden){lastActivity=Date.now();cloudPoll();}
     schedulePoll();});
 }
-async function enterPublicView(){
-  showBoot();
-  me={role:'viewer',name:'Viewer'};
-  try{ await cloudLoad(); setSyncStatus('synced'); }
-  catch(e){ setSyncStatus('error',e.message); }
-  await fetchRoster();
-  applyRole();
-  mode='dashboard';
-  render();
-  startWallClock();
-  hideBoot();
-  setTimeout(backgroundLoadOlder,1500);
-  refreshServerTotals(true);
-  setInterval(()=>refreshServerTotals(false),60000);
-  /* keep the shared view live: poll like the normal app, and refresh on focus */
-  startAdaptivePoll();
-  window.addEventListener('focus',()=>{lastActivity=Date.now();cloudPoll();});
-  setInterval(fetchRoster,60000);
-}
 function showLogin(){
   hideBoot();
   const ls=document.getElementById('loginScreen');ls.style.display='';
@@ -3770,7 +3738,6 @@ function showLogin(){
     me={role:'manager',name:'Local'};applyRole();
     render(); startWallClock(); hideBoot(); return;
   }
-  if(PUBLIC_VIEW){ await enterPublicView(); return; }
   if(session&&await ensureFreshSession()){ await enterApp(); }
   else { session=null; saveSession(); showLogin(); }
 })();
