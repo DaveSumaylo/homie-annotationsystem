@@ -1776,7 +1776,7 @@ function qcErrSeries(day){
   const wk={},mo={};
   state.episodes.forEach(e=>{
     if(!e.done||!e.qcChecked||!isFulltimeName(e.assignee))return;
-    const d=(e.qcDate||'').slice(0,10);
+    const d=qcDay(e);   /* same local-date helper as everywhere else in QC Analytics */
     if(!d||!/^\d{4}-\d{2}-\d{2}$/.test(d)||d.slice(0,4)!==YR)return;
     const bad=qcErrCount(e)>0?1:0;
     const w=isoWeekRange(d)[0];
@@ -2642,11 +2642,24 @@ function renderQC(){
 }
 
 /* ---------- QC Analytics (manager + QC) ---------- */
-function qcDay(e){                     /* period key = when QC checked it */
-  if(!e.qcDate)return '';
-  const d=String(e.qcDate);
-  return d.length>=10?d.slice(0,10):'';
+/* Single source of truth for turning a stored qc_date into a calendar-date key.
+   The QC page shows each date via qcDateOnly() = the LOCAL calendar date. Analytics
+   MUST bucket by that same local date. Previously this sliced the first 10 chars off
+   the stored UTC string, so a value like 2026-08-13T16:00Z (which the picker writes
+   for a locally-chosen "Aug 14" in UTC+8, and which the QC page shows as Aug 14) got
+   bucketed as Aug 13 — making the Aug 14 daily tile read 0. A pure date-only value is
+   taken as-is, never through new Date(), so no UTC shift can move the calendar day. */
+function qcLocalDateKey(v){
+  if(!v)return '';
+  const s=String(v).trim();
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if(!m)return '';
+  if(m[4]===undefined)return m[1]+'-'+m[2]+'-'+m[3];   /* date-only → keep the calendar date */
+  const d=new Date(s);                                  /* has a time → local calendar date */
+  if(isNaN(d))return m[1]+'-'+m[2]+'-'+m[3];
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function qcDay(e){ return qcLocalDateKey(e.qcDate); }   /* period key = local date QC checked it (matches the QC page) */
 function qcHasError(e){return qcErrCount(e)>0;}
 let _qcRevCache=null,_qcRevKey='';
 function qcReviewedFT(){               /* full-timers only, everywhere */
