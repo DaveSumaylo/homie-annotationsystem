@@ -1575,9 +1575,13 @@ function seedLlamaOnce(){
 function fmtHM(mins){const h=Math.floor(mins/60),m=Math.round(mins%60);return h+'h '+String(m).padStart(2,'0')+'m';}
 function fmtHrs(hh){return (Math.round(hh*100)/100).toString();}
 function nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-function openShifts(){return state.timeEntries.filter(t=>t.start&&!t.end);}
-function isOnClock(p){return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end);}
-function openShiftFor(p){return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end)||null;}
+/* "Active" = an OPEN shift dated TODAY. A shift left open from an earlier day is a
+   stale/historical anomaly: it stays in the data (still shown, flagged, and editable)
+   but must never count as currently-logged-in, block a fresh clock-in, or drive the
+   badge. Day comparison uses todayISO() (local date) — no UTC conversion. */
+function openShifts(){const today=todayISO();return state.timeEntries.filter(t=>t.start&&!t.end&&t.day===today);}
+function isOnClock(p){const today=todayISO();return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end&&t.day===today);}
+function openShiftFor(p){const today=todayISO();return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end&&t.day===today)||null;}
 function openShiftsPanel(){
   const today=todayISO();
   const open=state.timeEntries.filter(t=>t.start&&!t.end)
@@ -1610,39 +1614,45 @@ function updateShiftBadge(){
 }
 function clockInPerson(p){
   if(!p)return;
-  if(isOnClock(p)){toast(p+' is already clocked in');return;}
+  if(isOnClock(p)){toast(p+' is already clocked in');return;}   /* one active session per person per day */
   const day=todayISO();
   const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:p,start:day+'T'+nowHM(),end:'',minutes:0,day};
   state.timeEntries.push(e);pendingTimeAdds.add(e.id);savePendAdds();save();persistLocal();pushEntry(e);
   toast(p+' clocked in · '+tlHM(e.start));
-  renderTimeLog();
+  renderTimeLog();render();
 }
 async function clockOutPerson(p){
   if(!p)return;
-  const t=state.timeEntries.find(x=>x.person===p&&x.start&&!x.end);
-  if(!t){toast('No open shift for '+p);return;}
-  t.end=todayISO()+'T'+nowHM();
-  const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;
+  const today=todayISO();
+  /* Close ONLY today's open session(s) for this person. If duplicate open shifts
+     exist (e.g. a two-device race) we close them ALL — previously only the first
+     was closed, leaving one open that showed as "not clocked out" next morning.
+     A shift left open from an earlier day is historical and is never touched here. */
+  const list=state.timeEntries.filter(x=>x.person===p&&x.start&&!x.end&&x.day===today);
+  if(!list.length){toast('No open shift for '+p);return;}
+  const end=today+'T'+nowHM();
+  for(const t of list){t.end=end;const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;}
   save();persistLocal();
   /* The clock-out record MUST reach the database before we release their work.
      Previously this was fire-and-forget, so the release could succeed while the
      shift stayed open — losing the hours. */
   if(CLOUD&&session){
     try{
-      await cloudUpsertEntries([t]);
-      syncedTimes.set(t.id,timeSig(t));
-      if(pendingTimeAdds.delete(t.id))savePendAdds();
+      await cloudUpsertEntries(list);
+      for(const t of list){syncedTimes.set(t.id,timeSig(t));pendingTimeAdds.delete(t.id);}
+      savePendAdds();
       setSyncStatus('synced');
     }catch(e){
       setSyncStatus('error',e.message);
-      t.end='';t.minutes=0;                       /* roll back: still clocked in */
+      for(const t of list){t.end='';t.minutes=0;}   /* roll back: still clocked in */
       save();persistLocal();renderTimeLog();
       toast('⚠ CLOCK OUT NOT SAVED — please try again');
       console.error('clockout save failed',e);
       return;                                     /* do NOT release */
     }
   }
-  toast(p+' clocked out · '+fmtHM(t.minutes));
+  const totalMin=list.reduce((s,t)=>s+(t.minutes||0),0);
+  toast(p+' clocked out · '+fmtHM(totalMin));
   if(CLOUD&&session&&engineOk){sbRpc('release_to_backlog',{p_user:p}).then(async n=>{const c=Array.isArray(n)?n[0]:n;
     try{await fullEpisodeResync();}catch(e){console.error('resync after clockout',e);}
     render();
