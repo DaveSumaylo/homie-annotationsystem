@@ -1043,42 +1043,7 @@ async function sbFetch(path,opts){let r=await fetch(sbBase()+path,opts);
    user on this device actually changed it — never from its cached copy.
    Otherwise a stale tab overwrites someone else's assignment. */
 const assigneeEdits=new Set();
-/* Egress optimization: only request fields the app actually uses. */
-const EP_SELECT='id,bot,name,task_code,assignee,date_labeled,done,is_new,qc_name,qc_date,qc_checked,qc_comment,qc_errors,status,updated_at';
-const TIME_SELECT='id,person,start,end,minutes,day,updated_at';
-/* Server snapshot per episode. Used to send only fields that this browser actually changed. */
-let syncedEpRows=new Map();
-function markAssigneeEdit(id){assigneeEdits.add(id);} 
-function epSnapshot(e){return {id:e.id,bot:e.bot||'',name:e.name||'',task_code:e.taskCode||'',assignee:e.assignee||'',date_labeled:e.dateLabeled||'',done:!!e.done,qc_name:e.qcName||null,qc_date:e.qcDate||null,qc_checked:!!e.qcChecked,qc_comment:e.qcComment||null,qc_errors:Array.isArray(e.qcErrors)?e.qcErrors:[],is_new:!!e.isNew,status:e.status||''};}
-const EP_SYNC_FIELDS=['bot','name','task_code','date_labeled','done','qc_name','qc_date','qc_checked','qc_comment','qc_errors'];
-function epPatch(e,base){
-  const row=epToRow(e);
-  if(!base)return row;
-  const patch={id:e.id};
-  const cur=epSnapshot(e);
-  const b=base;
-  for(const f of EP_SYNC_FIELDS){
-    const a=JSON.stringify(cur[f]);const z=JSON.stringify(b[f]);
-    if(a!==z)patch[f]=row[f];
-  }
-  if(assigneeEdits.has(e.id)&&String(cur.assignee)!==String(b.assignee))patch.assignee=row.assignee;
-  return Object.keys(patch).length>1?patch:null;
-}
-function mergeServerEpisode(cur,inc,touched){
-  const t=touched||new Set();
-  if(!t.has('bot'))cur.bot=inc.bot;
-  if(!t.has('name'))cur.name=inc.name;
-  if(!t.has('task_code'))cur.taskCode=inc.taskCode;
-  if(!t.has('date_labeled'))cur.dateLabeled=inc.dateLabeled;
-  if(!t.has('done'))cur.done=inc.done;
-  if(!t.has('qc_name'))cur.qcName=inc.qcName;
-  if(!t.has('qc_date'))cur.qcDate=inc.qcDate;
-  if(!t.has('qc_checked'))cur.qcChecked=inc.qcChecked;
-  if(!t.has('qc_comment'))cur.qcComment=inc.qcComment;
-  if(!t.has('qc_errors'))cur.qcErrors=inc.qcErrors;
-  if(!assigneeEdits.has(inc.id))cur.assignee=inc.assignee;
-  cur.isNew=inc.isNew;cur.status=inc.status;
-}
+function markAssigneeEdit(id){assigneeEdits.add(id);}
 function epToRow(e){
   const row={id:e.id,bot:e.bot,name:e.name,task_code:e.taskCode||'',date_labeled:e.dateLabeled||'',done:!!e.done,qc_name:e.qcName||null,qc_date:e.qcDate||null,qc_checked:!!e.qcChecked,qc_comment:e.qcComment||null,qc_errors:e.qcErrors||[]};
   if(assigneeEdits.has(e.id))row.assignee=e.assignee||'';   /* only when set here */
@@ -1090,7 +1055,6 @@ function metaSig(){return JSON.stringify({bots:state.bots,annotators:state.annot
 function setSyncStatus(s,msg){const el=document.getElementById('syncDot');if(el){el.className='syncdot '+s;el.title=msg||({synced:'Synced to cloud',sync:'Syncing…',error:'Cloud sync error',off:'Local only — not synced'}[s]||s);}}
 
 async function cloudCount(){const r=await sbFetch('episodes?select=id&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
-async function cloudCountWindow(){const r=await sbFetch('episodes?select=id&recording_date=gte.'+encodeURIComponent(windowStartISO())+'&limit=1',{headers:sbHeaders({'Prefer':'count=exact'})});const cr=r.headers.get('content-range')||'0-0/0';const m=cr.match(/\/(\d+)$/);return m?+m[1]:0;}
 const EP_WINDOW_DAYS=30;
 function windowStartISO(){const d=new Date();d.setDate(d.getDate()-EP_WINDOW_DAYS);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -1100,7 +1064,7 @@ async function cloudLoadRange(fromISO,toISO){
   let flt='&recording_date=gte.'+encodeURIComponent(fromISO);
   if(toISO)flt+='&recording_date=lte.'+encodeURIComponent(toISO);
   while(true){
-    const r=await sbFetch('episodes?select='+encodeURIComponent(EP_SELECT)+flt+'&order=id&limit='+page+'&offset='+off,{headers:sbHeaders()});
+    const r=await sbFetch('episodes?select=*'+flt+'&order=id&limit='+page+'&offset='+off,{headers:sbHeaders()});
     const rows=await r.json();
     all.push(...rows);
     if(rows.length<page)break;
@@ -1116,18 +1080,24 @@ function mergeLoadedRows(rows){
     if(pendingEpDeletes.has(r.id))return;
     const ex=have.get(r.id);
     const inc=rowToEp(r);
-    if(!ex){state.episodes.push(inc);added++;syncedEps.set(inc.id,epSig(inc));syncedEpRows.set(inc.id,epSnapshot(inc));}
+    if(!ex){state.episodes.push(inc);added++;syncedEps.set(inc.id,epSig(inc));}
     else{
       const pending=epSig(ex)!==syncedEps.get(ex.id);
-      /* A COMPLETED episode on the server is a fact, not a negotiation — always
-         accept it, even if this browser is showing a stale cached copy. */
+      /* A COMPLETED episode OR a QC review on the server is a fact, not a
+         negotiation — always accept it, even if this browser is showing a stale
+         cached copy. Mirrors the closed-shift rule. Without this, yesterday's
+         finished work reappears as un-done, and yesterday's QC review reappears
+         as un-reviewed, on the morning reload: syncedEps starts empty on a fresh
+         load, which makes every cached episode look like an unsaved local edit
+         and blocks the server's real data from being adopted. These guards only
+         let the server WIN a definitive done/QC state — they never blank a local
+         done/QC with an empty server value, so genuine local work is safe. */
+      const qcd=e=>!!e.qcChecked||!!(e.qcDate&&String(e.qcDate).trim());
       const serverDone=!!inc.done&&!ex.done;
-      if((!pending||serverDone)&&epSig(ex)!==epSig(inc)){
-        Object.assign(ex,inc);
-        syncedEps.set(ex.id,epSig(ex));
-        syncedEpRows.set(ex.id,epSnapshot(ex));
-      }
+      const serverQC=qcd(inc)&&!qcd(ex);
+      if((!pending||serverDone||serverQC)&&epSig(ex)!==epSig(inc)){Object.assign(ex,inc);}
       if(ex.isNew!==inc.isNew)ex.isNew=inc.isNew;
+      syncedEps.set(ex.id,epSig(ex));
     }
     epWatermark=maxWm([r],epWatermark);
   });
@@ -1145,7 +1115,7 @@ async function backgroundLoadOlder(){
     console.log('%c[Project Homie] older episodes loaded in background','color:#10a874','+'+n.toLocaleString());
   }catch(e){console.warn('background load failed',e);_bgLoaded=false;_bgLoading=false;}
 }
-async function cloudLoadAll(){const _t0=Date.now();let _reqs=0;const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select='+encodeURIComponent(EP_SELECT)+'&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
+async function cloudLoadAll(){const _t0=Date.now();let _reqs=0;const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('episodes?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudLoadMeta(){try{const r=await sbFetch('app_meta?id=eq.1&select=data',{headers:sbHeaders()});const j=await r.json();return (j[0]&&j[0].data)||null;}catch(e){return null;}}
 async function cloudLoad(){
   const _boot=Date.now();
@@ -1173,24 +1143,16 @@ async function cloudLoad(){
     syncedTimes=new Map(cloudT.map(t=>[t.id,timeSig(t)]));
   }catch(e){console.error('time entries load',e);}
   syncedEps=new Map(state.episodes.map(e=>[e.id,epSig(e)]));
-  syncedEpRows=new Map(state.episodes.map(e=>[e.id,epSnapshot(e)]));
   syncedMeta=metaSig();
   persistLocal();
 }
 async function cloudChunkUpsert(rows){
-  /* PostgREST batches require a consistent column set. Group patches by their
-     exact keys so we can send small payloads instead of the whole episode row. */
-  const groups=new Map();
-  for(const row of rows){
-    const key=Object.keys(row).sort().join('|');
-    if(!groups.has(key))groups.set(key,[]);
-    groups.get(key).push(row);
-  }
-  for(const group of groups.values()){
-    for(let i=0;i<group.length;i+=500){
-      const chunk=group.slice(i,i+500);
-      await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});
-    }
+  /* rows that carry `assignee` must be sent separately from those that don't:
+     a PostgREST batch needs every row to have the same columns */
+  const withA=rows.filter(r=>Object.prototype.hasOwnProperty.call(r,'assignee'));
+  const noA  =rows.filter(r=>!Object.prototype.hasOwnProperty.call(r,'assignee'));
+  for(const group of [noA,withA]){
+    for(let i=0;i<group.length;i+=500){const chunk=group.slice(i,i+500);await sbFetch('episodes?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}
   }
 }
 async function cloudChunkDelete(ids){for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('episodes?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}}
@@ -1214,44 +1176,20 @@ async function cloudFlush(){
   syncing=true;setSyncStatus('sync');
   try{
     const cur=new Map(state.episodes.map(e=>[e.id,e]));
-    const changed=[];const patches=[];const localChanged=new Map();
-    for(const [id,e] of cur){
-      if(syncedEps.get(id)!==epSig(e)){
-        changed.push(e);
-        const base=syncedEpRows.get(id)||null;
-        const patch=epPatch(e,base);
-        if(patch){patches.push(patch);localChanged.set(id,new Set(Object.keys(patch).filter(k=>k!=='id')));}
-      }
-    }
+    const changed=[];for(const [id,e] of cur){if(syncedEps.get(id)!==epSig(e))changed.push(e);}
     /* WINDOWED LOADING: an episode missing locally may simply be outside the loaded
        window. Only delete what the user explicitly deleted. */
     const removed=[];for(const id of pendingEpDeletes)if(!cur.has(id))removed.push(id);
-    if(patches.length)await cloudChunkUpsert(patches);
+    if(changed.length)await cloudChunkUpsert(changed.map(epToRow));
     if(removed.length)await cloudChunkDelete(removed);
     const ms=metaSig();if(ms!==syncedMeta){await cloudPushMeta();syncedMeta=ms;}
-    /* Re-read only changed episodes after a patch. This preserves server-side fields
-       that this browser did not edit (especially QC) and refreshes stale local copies. */
-    if(changed.length){
-      for(let i=0;i<changed.length;i+=100){
-        const ids=changed.slice(i,i+100).map(e=>encodeURIComponent(e.id)).join(',');
-        const rr=await sbFetch('episodes?select='+encodeURIComponent(EP_SELECT)+'&id=in.('+ids+')',{headers:sbHeaders()});
-        const serverRows=await rr.json();
-        const idx=new Map(state.episodes.map(e=>[e.id,e]));
-        for(const raw of serverRows){
-          const inc=rowToEp(raw);const curE=idx.get(inc.id);if(!curE)continue;
-          const touched=localChanged.get(inc.id)||new Set();
-          mergeServerEpisode(curE,inc,touched);
-          syncedEps.set(inc.id,epSig(curE));syncedEpRows.set(inc.id,epSnapshot(inc));
-        }
-      }
-    }
     const curT=new Map(state.timeEntries.map(t=>[t.id,t]));
     const tChanged=[];for(const [id,t] of curT){if(syncedTimes.get(id)!==timeSig(t))tChanged.push(t);}
     const tRemoved=[];for(const id of syncedTimes.keys())if(!curT.has(id))tRemoved.push(id);
     if(tChanged.length)await cloudUpsertEntries(tChanged);
     if(tRemoved.length)for(let i=0;i<tRemoved.length;i+=50){const chunk=tRemoved.slice(i,i+50).map(encodeURIComponent).join(',');await sbFetch('time_entries?id=in.('+chunk+')',{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});}
-    for(const e of changed){syncedEps.set(e.id,epSig(e));syncedEpRows.set(e.id,epSnapshot(e));}
-    for(const id of removed){syncedEps.delete(id);syncedEpRows.delete(id);pendingEpDeletes.delete(id);}
+    for(const e of changed)syncedEps.set(e.id,epSig(e));
+    for(const id of removed){syncedEps.delete(id);pendingEpDeletes.delete(id);}
     /* assignee writes are confirmed once synced */
     for(const id of assigneeEdits)if(syncedEps.has(id))assigneeEdits.delete(id);
     for(const t of tChanged){syncedTimes.set(t.id,timeSig(t));pendingTimeAdds.delete(t.id);}
@@ -1272,7 +1210,6 @@ async function fullEpisodeResync(){
   const rows=await cloudLoadRange(windowStartISO(),null);epWatermark=maxWm(rows,epWatermark);
   mergeLoadedRows(rows);
   syncedEps=new Map(state.episodes.map(e=>[e.id,epSig(e)]));
-  syncedEpRows=new Map(state.episodes.map(e=>[e.id,epSnapshot(e)]));
   return;
   /* legacy full-replace path (unused) */
   const cmap=new Map(rows.map(r=>[r.id,r]));
@@ -1295,14 +1232,16 @@ async function fullTimeResync(){
   syncedTimes=new Map(raw.map(r=>[r.id,timeSig(mapT(r))]));
 }
 /* ---------- adaptive polling ----------
-   Time Log safety: server-closed shifts always win during merge.
-   Polling cadence is unchanged in this focused Time Log fix. */
+   active tab + recent activity -> 15s (unchanged for users)
+   background tab               -> 60s
+   idle > 10 min                -> 120s
+   returning to the tab polls immediately. */
 let lastActivity=Date.now(), pollTimer=null;
 function pollInterval(){
-  if(document.hidden)return 120000;
+  if(document.hidden)return 60000;
   const idleMs=Date.now()-lastActivity;
-  if(idleMs>10*60*1000)return 300000;
-  return 30000;
+  if(idleMs>10*60*1000)return 120000;
+  return 15000;
 }
 function schedulePoll(){
   clearTimeout(pollTimer);
@@ -1333,7 +1272,7 @@ async function cloudPoll(){
     }catch(e){console.error('poll meta',e);}
     // episodes: incremental by updated_at, then count check for deletions
     try{
-      const r=await sbFetch('episodes?select='+encodeURIComponent(EP_SELECT)+'&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(epWatermark||'1970-01-01'),{headers:sbHeaders()});
+      const r=await sbFetch('episodes?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(epWatermark||'1970-01-01'),{headers:sbHeaders()});
       const rows=await r.json();
       if(rows.length){
         epWatermark=maxWm(rows,epWatermark);
@@ -1341,34 +1280,25 @@ async function cloudPoll(){
         for(const raw of rows){const inc=rowToEp(raw);
           if(pendingEpDeletes.has(inc.id)){syncedEps.set(inc.id,epSig(inc));continue;}
           const cur=idx.get(inc.id);
-          if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);syncedEps.set(inc.id,epSig(inc));syncedEpRows.set(inc.id,epSnapshot(inc));dirty=true;}
-          else{
-            const pending=epSig(cur)!==syncedEps.get(cur.id);
-            if(!pending){
-              if(epSig(cur)!==epSig(inc)){Object.assign(cur,inc);dirty=true;}
-              syncedEps.set(inc.id,epSig(cur));syncedEpRows.set(inc.id,epSnapshot(cur));
-            }else{
-              /* This browser has local edits. Keep those edits, but adopt server
-                 changes to fields it did not edit. This prevents a stale QC copy
-                 from overwriting a newer server QC result. */
-              const base=syncedEpRows.get(inc.id)||epSnapshot(cur);
-              const touched=new Set();
-              const local=epSnapshot(cur);
-              for(const f of EP_SYNC_FIELDS)if(JSON.stringify(local[f])!==JSON.stringify(base[f]))touched.add(f);
-              mergeServerEpisode(cur,inc,touched);dirty=true;
-              /* Keep the old server snapshot as the comparison baseline until the
-                 local edit is actually flushed. */
-            }
-          }
+          if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);syncedEps.set(inc.id,epSig(inc));dirty=true;}
+          else{const pending=epSig(cur)!==syncedEps.get(cur.id);
+            if(!pending&&epSig(cur)!==epSig(inc)){Object.assign(cur,inc);dirty=true;}
+            /* is_new is server-owned and not part of epSig — adopt it always,
+               otherwise a fresh→backlog flip (no assignee change) is never seen */
+            if(cur.isNew!==inc.isNew){cur.isNew=inc.isNew;dirty=true;}
+            if(cur.status!==inc.status){cur.status=inc.status;dirty=true;}
+            /* assignee is server-owned unless this device is mid-edit */
+            if(!assigneeEdits.has(inc.id)&&cur.assignee!==inc.assignee){
+              cur.assignee=inc.assignee;dirty=true;}
+            syncedEps.set(inc.id,epSig(inc));}
         }
       }
-      const n=await cloudCountWindow();
-      const localWindow=state.episodes.filter(e=>dateFromName(e.name)>=windowStartISO()).length;
-      if(n!==localWindow){await fullEpisodeResync();dirty=true;}
+      const n=await cloudCount();
+      if(n!==syncedEps.size){await fullEpisodeResync();dirty=true;}
     }catch(e){handlePollErr(e);}
     // time entries: same pattern
     try{
-      const r=await sbFetch('time_entries?select='+encodeURIComponent(TIME_SELECT)+'&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(tWatermark||'1970-01-01'),{headers:sbHeaders()});
+      const r=await sbFetch('time_entries?select=*&order=updated_at&limit=1000&updated_at=gt.'+encodeURIComponent(tWatermark||'1970-01-01'),{headers:sbHeaders()});
       const rows=await r.json();
       const mapT=x=>({id:x.id,person:x.person,start:x.start||'',end:x.end||'',minutes:x.minutes||0,day:x.day});
       if(rows.length){
@@ -1405,7 +1335,7 @@ function myAnnotatorName(){const n=((me&&me.name)||'').trim();if(!n)return null;
 function mergeEngineRows(rows){if(!Array.isArray(rows)||!rows.length)return false;const idx=new Map(state.episodes.map(e=>[e.id,e]));let ch=false;
   for(const r of rows){const inc=rowToEp(r);const cur=idx.get(inc.id);
     if(!cur){state.episodes.push(inc);idx.set(inc.id,inc);}else{Object.assign(cur,inc);}
-    syncedEps.set(inc.id,epSig(inc));syncedEpRows.set(inc.id,epSnapshot(inc));ch=true;}
+    syncedEps.set(inc.id,epSig(inc));ch=true;}
   if(ch)persistLocal();return ch;}
 function engineFail(e){const m=String((e&&e.message)||'');
   if(m.indexOf('404')>=0||m.toLowerCase().indexOf('function')>=0){if(engineOk){engineOk=false;toast('ASSIGNMENT ENGINE OFF — run the Phase 1 SQL');}}
@@ -1437,7 +1367,7 @@ async function engineOnComplete(epId){
   try{const rows=await sbRpc('complete_episode',{p_id:epId,p_batch:batch});
     if(Array.isArray(rows)&&rows.length){mergeEngineRows(rows);toast('QUEUE REFILLED · +'+rows.length);if(!isTypingNow())render();}
   }catch(err){engineFail(err);}}
-async function cloudMigrate(){if(!CLOUD)return;syncedEps=new Map();syncedEpRows=new Map();syncedMeta='';await cloudFlush();}
+async function cloudMigrate(){if(!CLOUD)return;syncedEps=new Map();syncedMeta='';await cloudFlush();}
 async function cloudConnect(url,key){
   SB={url,key};CLOUD=true;saveSbConfig();setSyncStatus('sync');
   if(session&&await ensureFreshSession()){
@@ -1645,31 +1575,24 @@ function seedLlamaOnce(){
 function fmtHM(mins){const h=Math.floor(mins/60),m=Math.round(mins%60);return h+'h '+String(m).padStart(2,'0')+'m';}
 function fmtHrs(hh){return (Math.round(hh*100)/100).toString();}
 function nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-/* ---------- safe Time Log shift helpers ----------
-   A person may have old/stale open records, but only TODAY's open shift is an
-   active shift for clock-in/out. Stale records are preserved for manager review
-   and must never be silently closed or overwritten by today's actions. */
-function openShifts(){return todayOpenShifts();}
-function todayOpenShifts(){const today=todayISO();return state.timeEntries.filter(t=>t.start&&!t.end&&t.day===today);}
-function staleOpenShiftsFor(p){const today=todayISO();return state.timeEntries.filter(t=>t.person===p&&t.start&&!t.end&&t.day<today);}
-function isOnClock(p){const today=todayISO();return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end&&t.day===today);}
-function openShiftFor(p){const today=todayISO();return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end&&t.day===today)||null;}
+function openShifts(){return state.timeEntries.filter(t=>t.start&&!t.end);}
+function isOnClock(p){return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end);}
+function openShiftFor(p){return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end)||null;}
 function openShiftsPanel(){
   const today=todayISO();
-  const active=state.timeEntries.filter(t=>t.start&&!t.end&&t.day===today)
-    .map(t=>{const mins=minutesBetween(t.start,today+'T'+nowHM());return {person:t.person,day:t.day,mins:(mins==null||mins<0)?0:mins,start:t.start};})
-    .sort((a,b)=>b.mins-a.mins);
-  if(!active.length)return '';
-  const activeRows=active.map(o=>{
-    const hrs=o.mins/60;
-    const cls=hrs>=10?'os-bad':(hrs>=8?'os-warn':'os-ok');
-    return `<div class="os-row ${cls}"><span class="os-name">${esc(o.person)}</span>
-      <span class="os-time">${Math.floor(o.mins/60)}h ${String(o.mins%60).padStart(2,'0')}m</span>
-      <span class="os-note">${hrs>=8?'long shift':'on shift'}</span></div>`;
-  }).join('');
+  const open=state.timeEntries.filter(t=>t.start&&!t.end)
+    .map(t=>{const mins=minutesBetween(t.start,today+'T'+nowHM());
+      return {person:t.person,day:t.day,mins:(mins==null||mins<0)?0:mins,stale:t.day<today};})
+    .sort((a,b)=>(b.stale-a.stale)||(b.mins-a.mins));
+  if(!open.length)return '';
+  const stale=open.filter(o=>o.stale).length;
   return `<div class="section-head" style="margin-top:4px"><h2>Currently clocked in</h2>
-      <span class="hint">${active.length} active today</span></div>
-    <div class="osp">${activeRows}</div>`;
+      <span class="hint">${open.length} open shift${open.length===1?'':'s'}${stale?` · ${stale} from a previous day`:''}</span></div>
+    <div class="osp">${open.map(o=>{
+      const hrs=o.mins/60; const cls=o.stale?'os-bad':(hrs>=10?'os-bad':(hrs>=8?'os-warn':'os-ok'));
+      return `<div class="os-row ${cls}"><span class="os-name">${esc(o.person)}</span>
+        <span class="os-time">${Math.floor(o.mins/60)}h ${String(o.mins%60).padStart(2,'0')}m</span>
+        <span class="os-note">${o.stale?'⚠ not clocked out — '+esc(o.day):(hrs>=8?'long shift':'on shift')}</span></div>`;}).join('')}</div>`;
 }
 function updateShiftBadge(){
   const el=document.getElementById('shiftBadge');if(!el)return;
@@ -1687,23 +1610,17 @@ function updateShiftBadge(){
 }
 function clockInPerson(p){
   if(!p)return;
-  const today=todayISO();
-  const active=openShiftFor(p);
-  if(active){toast(p+' is already clocked in today');return;}
-  /* Historical open records are ignored for today's attendance. They remain in
-     the database for history but must never block a new shift or affect today's state. */
-  const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:p,start:today+'T'+nowHM(),end:'',minutes:0,day:today};
+  if(isOnClock(p)){toast(p+' is already clocked in');return;}
+  const day=todayISO();
+  const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:p,start:day+'T'+nowHM(),end:'',minutes:0,day};
   state.timeEntries.push(e);pendingTimeAdds.add(e.id);savePendAdds();save();persistLocal();pushEntry(e);
   toast(p+' clocked in · '+tlHM(e.start));
   renderTimeLog();
 }
 async function clockOutPerson(p){
   if(!p)return;
-  const t=openShiftFor(p);
-  if(!t){
-    toast('No open shift for '+p+' today');
-    return;
-  }
+  const t=state.timeEntries.find(x=>x.person===p&&x.start&&!x.end);
+  if(!t){toast('No open shift for '+p);return;}
   t.end=todayISO()+'T'+nowHM();
   const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;
   save();persistLocal();
@@ -1744,7 +1661,7 @@ function tickWallClock(){
 function startWallClock(){if(wallTimer)clearInterval(wallTimer);wallTimer=setInterval(tickWallClock,1000);}
 
 async function cloudPushEntry(entry){await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify([{id:entry.id,person:entry.person,start:entry.start||null,end:entry.end||null,minutes:entry.minutes,day:entry.day}])});}
-async function cloudLoadEntries(){const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('time_entries?select='+encodeURIComponent(TIME_SELECT)+'&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
+async function cloudLoadEntries(){const all=[];let from=0;const page=1000;while(true){const r=await sbFetch('time_entries?select=*&order=id&limit='+page+'&offset='+from,{headers:sbHeaders()});const rows=await r.json();all.push(...rows);if(rows.length<page)break;from+=page;}return all;}
 async function cloudUpsertEntries(entries){for(let i=0;i<entries.length;i+=500){const chunk=entries.slice(i,i+500).map(e=>({id:e.id,person:e.person,start:e.start||null,end:e.end||null,minutes:e.minutes,day:e.day}));await sbFetch('time_entries?on_conflict=id',{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(chunk)});}}
 let deletedTimeIds=new Set();try{deletedTimeIds=new Set(JSON.parse(localStorage.getItem('projectHomie.tdel')||'[]'));}catch(e){}
 let pendingTimeAdds=new Set();try{pendingTimeAdds=new Set(JSON.parse(localStorage.getItem('projectHomie.tpend')||'[]'));}catch(e){}
@@ -1849,7 +1766,7 @@ function qcErrSeries(day){
   const wk={},mo={};
   state.episodes.forEach(e=>{
     if(!e.done||!e.qcChecked||!isFulltimeName(e.assignee))return;
-    const d=qcDateOnly(e.qcDate);
+    const d=(e.qcDate||'').slice(0,10);
     if(!d||!/^\d{4}-\d{2}-\d{2}$/.test(d)||d.slice(0,4)!==YR)return;
     const bad=qcErrCount(e)>0?1:0;
     const w=isoWeekRange(d)[0];
@@ -1919,7 +1836,6 @@ function renderDashboard(){
    <div class="dash-top"><h2>DASHBOARD</h2>
      <span class="dash-tools">
        ${isManager()?'<button id="btnWeekReport" title="Weekly report for the selected week">Weekly report</button>':''}
-       <button id="btnLoadHistory" title="Load older episodes only when historical data is needed">Load older history</button>
        <input type="date" id="dashDate" value="${day}">
      </span></div>
    <div class="stats">
@@ -2003,8 +1919,6 @@ function renderDashboard(){
   app.querySelector('#dashDate').addEventListener('change',e=>{dashDate=e.target.value;renderDashboard();});
   const wrb=app.querySelector('#btnWeekReport');
   if(wrb)wrb.addEventListener('click',()=>openWeeklyReport());
-  const lhb=app.querySelector('#btnLoadHistory');
-  if(lhb)lhb.addEventListener('click',async()=>{lhb.disabled=true;lhb.textContent='Loading…';try{await backgroundLoadOlder();toast('Older history loaded');renderDashboard();}catch(e){toast('History load failed: '+e.message);}finally{lhb.disabled=false;lhb.textContent='Load older history';}});
   destroyCharts();
   if(typeof Chart!=='undefined'){
     const c1=document.getElementById('cv-wperf');
@@ -2134,12 +2048,11 @@ function renderTimeLog(){
        <select id="ckInWho" class="ck-sel" style="display:none"><option value="">Who's clocking in?</option>${allAnnotators().filter(a=>!isOnClock(a)&&nameRole(a)!=='freelancer').map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
      </div>
      <div class="ck-group">
-       <button class="btn" id="btnCkOut" ${todayOpenShifts().length?'':'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Clock out${todayOpenShifts().length?' ('+todayOpenShifts().length+')':''}</button>
-       <select id="ckOutWho" class="ck-sel" style="display:none"><option value="">Who's clocking out?</option>${[...new Set(todayOpenShifts().map(t=>t.person))].map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+       <button class="btn" id="btnCkOut" ${openShifts().length?'':'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Clock out${openShifts().length?' ('+openShifts().length+')':''}</button>
+       <select id="ckOutWho" class="ck-sel" style="display:none"><option value="">Who's clocking out?</option>${[...new Set(openShifts().map(t=>t.person))].map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
      </div>
      <div class="wallclock"><div class="wc-time" id="wallTime"></div><div class="wc-date" id="wallDate"></div></div>
    </div>`}
-   ${isManager()&&state.timeEntries.some(t=>t.start&&!t.end&&t.day<todayISO())?`<div class="hint" style="margin:8px 0;padding:8px 10px;border:1px solid var(--border);border-radius:8px">⚠ Some open shifts are from previous days. They are preserved for manager review and will not be closed automatically.</div>`:''}
    <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${(!tlShowAll&&filtered.length>TLLIM)?' · showing '+TLLIM:(tlShowAll&&filtered.length>TLLIM)?' · showing all':''}</span>${(tlShowAll&&filtered.length>TLLIM)?`<button class="btn btn-sm" id="tlCollapse" style="margin-left:8px">Show recent only</button>`:''}
      ${isManager()?`<button class="btn btn-sm" id="tlDedup" style="margin-left:auto" title="Remove exact duplicate shifts">Remove duplicates</button><button class="btn btn-sm" id="tlCsvBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Import CSV</button><input type="file" id="tlCsvFile" accept=".csv,text/csv" style="display:none"><button class="btn btn-sm" id="tlAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
      ${mineOnly?`<span class="hint" style="margin-left:auto">${esc(mineOnly)}</span>`:`<select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select>`}</div>
@@ -2630,9 +2543,7 @@ function qcErrCount(e){return (e.qcErrors||[]).reduce((s,m)=>s+((m.codes||[]).le
 /* any error code present -> comment auto-set to RELABEL */
 function qcAutoComment(e){if(qcErrCount(e)>0&&qcCom(e.qcComment)!=='RELABEL'){e.qcComment='RELABEL';}}
 function qcSave(){save();scheduleCloudSync();}
-function qcLocalDateISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function qcDateStorage(d){return d?new Date(d+'T00:00:00Z').toISOString():'';}
-function qcStamp(e){const who=(me&&me.name)||'';if(e.qcChecked){e.qcName=who;e.qcDate=qcDateStorage(qcLocalDateISO());}else{e.qcName='';e.qcDate='';}}
+function qcStamp(e){const who=(me&&me.name)||'';if(e.qcChecked){e.qcName=who;e.qcDate=new Date().toISOString();}else{e.qcName='';e.qcDate='';}}
 
 function renderQC(){
   keepTreeScroll('qc');
@@ -2662,7 +2573,7 @@ function renderQC(){
     e.qcName=ev.target.value;qcSave();}));
   app.querySelectorAll('[data-qcdate]').forEach(el=>el.addEventListener('change',ev=>{
     const e=state.episodes.find(x=>x.id===el.dataset.qcdate);if(!e)return;
-    e.qcDate=ev.target.value?qcDateStorage(ev.target.value):'';qcSave();}));
+    e.qcDate=ev.target.value?new Date(ev.target.value+'T00:00:00').toISOString():'';qcSave();}));
   app.querySelectorAll('[data-qcnote]').forEach(el=>el.addEventListener('change',ev=>{
     const [id,i,ci]=el.dataset.qcnote.split('|');const e=state.episodes.find(x=>x.id===id);if(!e)return;
     const m=e.qcErrors[+i];if(!m||!m.codes[+ci])return;
@@ -2682,7 +2593,7 @@ function renderQC(){
     qcSave();renderQC();toast('QC name set on '+qcPicked.size);});
   const qbd=app.querySelector('#qbDate');
   if(qbd)qbd.addEventListener('change',ev=>{const d=ev.target.value;if(!d)return;
-    const iso=qcDateStorage(d);
+    const iso=new Date(d+'T00:00:00').toISOString();
     qcPicked.forEach(id=>{const e=state.episodes.find(x=>x.id===id);if(e)e.qcDate=iso;});
     qcSave();renderQC();toast('Check date set on '+qcPicked.size);});
   const qbdc=app.querySelector('#qbDateClr');
@@ -2721,8 +2632,10 @@ function renderQC(){
 }
 
 /* ---------- QC Analytics (manager + QC) ---------- */
-function qcDay(e){                     /* period key = local calendar date when QC was checked */
-  return qcDateOnly(e.qcDate);
+function qcDay(e){                     /* period key = when QC checked it */
+  if(!e.qcDate)return '';
+  const d=String(e.qcDate);
+  return d.length>=10?d.slice(0,10):'';
 }
 function qcHasError(e){return qcErrCount(e)>0;}
 let _qcRevCache=null,_qcRevKey='';
@@ -3403,7 +3316,7 @@ function repStats(from,to){
   const hrs=mins/60;
   /* QC reviewed in this window, by check date */
   const rev=state.episodes.filter(e=>e.done&&e.qcChecked&&isFulltimeName(e.assignee)
-              &&inRange(qcDateOnly(e.qcDate),from,to));
+              &&inRange((e.qcDate||'').slice(0,10),from,to));
   const withErr=rev.filter(e=>qcErrCount(e)>0).length;
   const codes=rev.reduce((s,e)=>s+qcErrCount(e),0);
   /* per person */
@@ -3803,10 +3716,7 @@ async function enterApp(){
   startAdaptivePoll();
   setInterval(fetchRoster,60000);
   refreshServerTotals(true);
-  /* Historical episodes are no longer downloaded for every user. Managers may still
-     load full history automatically because their all-time reporting depends on it;
-     other roles can use the explicit Load older history action when needed. */
-  setTimeout(()=>{if(isManager())backgroundLoadOlder();},1500);
+  setTimeout(backgroundLoadOlder,1500);   /* fill history after the app is usable */
   setInterval(()=>refreshServerTotals(false),60000);
   window.addEventListener('focus',()=>{lastActivity=Date.now();cloudPoll();schedulePoll();});
   ['mousedown','keydown','touchstart','scroll'].forEach(ev=>
