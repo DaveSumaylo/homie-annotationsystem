@@ -1227,10 +1227,8 @@ async function fullTimeResync(){
   syncedTimes=new Map(raw.map(r=>[r.id,timeSig(mapT(r))]));
 }
 /* ---------- adaptive polling ----------
-   active tab + recent activity -> 15s (unchanged for users)
-   background tab               -> 60s
-   idle > 10 min                -> 120s
-   returning to the tab polls immediately. */
+   Time Log safety: server-closed shifts always win during merge.
+   Polling cadence is unchanged in this focused Time Log fix. */
 let lastActivity=Date.now(), pollTimer=null;
 function pollInterval(){
   if(document.hidden)return 60000;
@@ -1570,24 +1568,31 @@ function seedLlamaOnce(){
 function fmtHM(mins){const h=Math.floor(mins/60),m=Math.round(mins%60);return h+'h '+String(m).padStart(2,'0')+'m';}
 function fmtHrs(hh){return (Math.round(hh*100)/100).toString();}
 function nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-function openShifts(){return state.timeEntries.filter(t=>t.start&&!t.end);}
-function isOnClock(p){return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end);}
-function openShiftFor(p){return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end)||null;}
+/* ---------- safe Time Log shift helpers ----------
+   A person may have old/stale open records, but only TODAY's open shift is an
+   active shift for clock-in/out. Stale records are preserved for manager review
+   and must never be silently closed or overwritten by today's actions. */
+function openShifts(){return todayOpenShifts();}
+function todayOpenShifts(){const today=todayISO();return state.timeEntries.filter(t=>t.start&&!t.end&&t.day===today);}
+function staleOpenShiftsFor(p){const today=todayISO();return state.timeEntries.filter(t=>t.person===p&&t.start&&!t.end&&t.day<today);}
+function isOnClock(p){const today=todayISO();return state.timeEntries.some(t=>t.person===p&&t.start&&!t.end&&t.day===today);}
+function openShiftFor(p){const today=todayISO();return state.timeEntries.find(t=>t.person===p&&t.start&&!t.end&&t.day===today)||null;}
 function openShiftsPanel(){
   const today=todayISO();
-  const open=state.timeEntries.filter(t=>t.start&&!t.end)
-    .map(t=>{const mins=minutesBetween(t.start,today+'T'+nowHM());
-      return {person:t.person,day:t.day,mins:(mins==null||mins<0)?0:mins,stale:t.day<today};})
-    .sort((a,b)=>(b.stale-a.stale)||(b.mins-a.mins));
-  if(!open.length)return '';
-  const stale=open.filter(o=>o.stale).length;
+  const active=state.timeEntries.filter(t=>t.start&&!t.end&&t.day===today)
+    .map(t=>{const mins=minutesBetween(t.start,today+'T'+nowHM());return {person:t.person,day:t.day,mins:(mins==null||mins<0)?0:mins,start:t.start};})
+    .sort((a,b)=>b.mins-a.mins);
+  if(!active.length)return '';
+  const activeRows=active.map(o=>{
+    const hrs=o.mins/60;
+    const cls=hrs>=10?'os-bad':(hrs>=8?'os-warn':'os-ok');
+    return `<div class="os-row ${cls}"><span class="os-name">${esc(o.person)}</span>
+      <span class="os-time">${Math.floor(o.mins/60)}h ${String(o.mins%60).padStart(2,'0')}m</span>
+      <span class="os-note">${hrs>=8?'long shift':'on shift'}</span></div>`;
+  }).join('');
   return `<div class="section-head" style="margin-top:4px"><h2>Currently clocked in</h2>
-      <span class="hint">${open.length} open shift${open.length===1?'':'s'}${stale?` · ${stale} from a previous day`:''}</span></div>
-    <div class="osp">${open.map(o=>{
-      const hrs=o.mins/60; const cls=o.stale?'os-bad':(hrs>=10?'os-bad':(hrs>=8?'os-warn':'os-ok'));
-      return `<div class="os-row ${cls}"><span class="os-name">${esc(o.person)}</span>
-        <span class="os-time">${Math.floor(o.mins/60)}h ${String(o.mins%60).padStart(2,'0')}m</span>
-        <span class="os-note">${o.stale?'⚠ not clocked out — '+esc(o.day):(hrs>=8?'long shift':'on shift')}</span></div>`;}).join('')}</div>`;
+      <span class="hint">${active.length} active today</span></div>
+    <div class="osp">${activeRows}</div>`;
 }
 function updateShiftBadge(){
   const el=document.getElementById('shiftBadge');if(!el)return;
@@ -1605,17 +1610,23 @@ function updateShiftBadge(){
 }
 function clockInPerson(p){
   if(!p)return;
-  if(isOnClock(p)){toast(p+' is already clocked in');return;}
-  const day=todayISO();
-  const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:p,start:day+'T'+nowHM(),end:'',minutes:0,day};
+  const today=todayISO();
+  const active=openShiftFor(p);
+  if(active){toast(p+' is already clocked in today');return;}
+  /* Historical open records are ignored for today's attendance. They remain in
+     the database for history but must never block a new shift or affect today's state. */
+  const e={id:'t'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),person:p,start:today+'T'+nowHM(),end:'',minutes:0,day:today};
   state.timeEntries.push(e);pendingTimeAdds.add(e.id);savePendAdds();save();persistLocal();pushEntry(e);
   toast(p+' clocked in · '+tlHM(e.start));
   renderTimeLog();
 }
 async function clockOutPerson(p){
   if(!p)return;
-  const t=state.timeEntries.find(x=>x.person===p&&x.start&&!x.end);
-  if(!t){toast('No open shift for '+p);return;}
+  const t=openShiftFor(p);
+  if(!t){
+    toast('No open shift for '+p+' today');
+    return;
+  }
   t.end=todayISO()+'T'+nowHM();
   const m=minutesBetween(t.start,t.end);t.minutes=m==null?0:m;
   save();persistLocal();
@@ -2043,11 +2054,12 @@ function renderTimeLog(){
        <select id="ckInWho" class="ck-sel" style="display:none"><option value="">Who's clocking in?</option>${allAnnotators().filter(a=>!isOnClock(a)&&nameRole(a)!=='freelancer').map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
      </div>
      <div class="ck-group">
-       <button class="btn" id="btnCkOut" ${openShifts().length?'':'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Clock out${openShifts().length?' ('+openShifts().length+')':''}</button>
-       <select id="ckOutWho" class="ck-sel" style="display:none"><option value="">Who's clocking out?</option>${[...new Set(openShifts().map(t=>t.person))].map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+       <button class="btn" id="btnCkOut" ${todayOpenShifts().length?'':'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Clock out${todayOpenShifts().length?' ('+todayOpenShifts().length+')':''}</button>
+       <select id="ckOutWho" class="ck-sel" style="display:none"><option value="">Who's clocking out?</option>${[...new Set(todayOpenShifts().map(t=>t.person))].map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
      </div>
      <div class="wallclock"><div class="wc-time" id="wallTime"></div><div class="wc-date" id="wallDate"></div></div>
    </div>`}
+   ${isManager()&&state.timeEntries.some(t=>t.start&&!t.end&&t.day<todayISO())?`<div class="hint" style="margin:8px 0;padding:8px 10px;border:1px solid var(--border);border-radius:8px">⚠ Some open shifts are from previous days. They are preserved for manager review and will not be closed automatically.</div>`:''}
    <div class="section-head" style="margin-top:22px"><h2>Time Log</h2><span class="hint">${filtered.length.toLocaleString()} record${filtered.length===1?'':'s'}${(!tlShowAll&&filtered.length>TLLIM)?' · showing '+TLLIM:(tlShowAll&&filtered.length>TLLIM)?' · showing all':''}</span>${(tlShowAll&&filtered.length>TLLIM)?`<button class="btn btn-sm" id="tlCollapse" style="margin-left:8px">Show recent only</button>`:''}
      ${isManager()?`<button class="btn btn-sm" id="tlDedup" style="margin-left:auto" title="Remove exact duplicate shifts">Remove duplicates</button><button class="btn btn-sm" id="tlCsvBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Import CSV</button><input type="file" id="tlCsvFile" accept=".csv,text/csv" style="display:none"><button class="btn btn-sm" id="tlAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add entry</button>`:'<span style="margin-left:auto"></span>'}
      ${mineOnly?`<span class="hint" style="margin-left:auto">${esc(mineOnly)}</span>`:`<select id="tlFilterSel" style="width:auto"><option value="">All annotators</option>${people.map(p=>`<option value="${esc(p)}" ${p===tlFilter?'selected':''}>${esc(p)}</option>`).join('')}</select>`}</div>
