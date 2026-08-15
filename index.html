@@ -1083,7 +1083,14 @@ function mergeLoadedRows(rows){
     if(!ex){state.episodes.push(inc);added++;syncedEps.set(inc.id,epSig(inc));}
     else{
       const pending=epSig(ex)!==syncedEps.get(ex.id);
-      if(!pending&&epSig(ex)!==epSig(inc)){Object.assign(ex,inc);}
+      /* A COMPLETED episode on the server is a fact, not a negotiation — always
+         accept it, even if this browser is showing a stale cached copy. Mirrors
+         the closed-shift rule. Without this, yesterday's finished work reappears
+         as un-done on the morning reload: syncedEps starts empty on a fresh load,
+         which makes every cached episode look like an unsaved local edit and
+         blocks the server's real (done) data from being adopted. */
+      const serverDone=!!inc.done&&!ex.done;
+      if((!pending||serverDone)&&epSig(ex)!==epSig(inc)){Object.assign(ex,inc);}
       if(ex.isNew!==inc.isNew)ex.isNew=inc.isNew;
       syncedEps.set(ex.id,epSig(ex));
     }
